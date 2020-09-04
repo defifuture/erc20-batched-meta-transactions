@@ -33,11 +33,11 @@ Every time a meta transaction is completed, the smart contract should update the
 
 - sender address (the user who is sending the meta tx)
 - receiver address
-- token amount to be transfered
-- relayer fee (in tokens)
-- nonce
-- hash (hash of the values above: sender address, receiver address, token amount, relayer fee, nonce) 
-- signature (signed hash)
+- token amount to be transfered - uint256
+- relayer fee (in tokens) - uint256
+- nonce - uint256
+- hash (hash of the values above: sender address, receiver address, token amount, relayer fee, nonce) - bytes32
+- signature (signed hash) - bytes32
 
 ### How is the data (about meta txs) sent to the smart contract?
 
@@ -45,7 +45,7 @@ When a relayer receives multiple meta txs and decides to make a batch onchain tr
 
 In web development, the data would be sent in a JSON format. But since Solidity does not have a JSON parser (and parsing data onchain would also be quite expensive), the data could be sent as arrays instead (to avoid parsing a huge string of data).
 
-Currently, it seems that the best approach is the one that is used by [Disperse](https://github.com/banteg/disperse-research/blob/master/contracts/Disperse.sol), which means sending each type of meta data as a **separate array**. One array would consist of sender addresses, the other of receiver addresses, and then 5 more arrays for a token amount, a relayer fee, a nonce, a hash and a signature.
+Currently, it seems that the best approach is the one that is used by [Disperse](https://github.com/banteg/disperse-research/blob/master/contracts/Disperse.sol), which means sending each type of meta data as a **separate array**. One array would consist of sender addresses, the other of receiver addresses, and then 5 more arrays for a token amount, a relayer fee, a nonce, a hash (bytes32 array) and a signature (bytes32 array).
 
 The crucial part here is that the data in arrays must be in the **correct order**. If the ordering is wrong, the smart contract would notice that (because hashes wouldn't match) and abort the change.
 
