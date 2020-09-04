@@ -36,6 +36,18 @@ Every time a meta transaction is completed, the smart contract should update the
 - token amount to be transfered
 - relayer fee (in tokens)
 - nonce
+- hash (hash of the values above: sender address, receiver address, token amount, relayer fee, nonce) 
+- signature (signed hash)
+
+### How is the data (about meta txs) sent to the smart contract?
+
+When a relayer receives multiple meta txs and decides to make a batch onchain transaction, the data needs to be sent to the smart contract in a way that takes the least amount of gas.
+
+In web development, the data would be sent in a JSON format. But since Solidity does not have a JSON parser (and parsing data onchain would also be quite expensive), the data could be sent as arrays instead (to avoid parsing a huge string of data).
+
+Currently, it seems that the best approach is the one that is used by [Disperse](https://github.com/banteg/disperse-research/blob/master/contracts/Disperse.sol), which means sending each type of meta data as a **separate array**. One array would consist of sender addresses, the other of receiver addresses, and then 5 more arrays for a token amount, a relayer fee, a nonce, a hash and a signature.
+
+The crucial part here is that the data in arrays must be in the **correct order**. If the ordering is wrong, the smart contract would notice that (because hashes wouldn't match) and abort the change.
 
 ### What is the relayer fee?
 
@@ -62,3 +74,11 @@ Another option could be that the meta tx sender sends the meta tx to many relaye
 ### What about approve and allowance?
 
 This proof-of-concept only targets the basic token transfer functionality, so the approve txs are not needed here (might be added later). But it should work in a similar way.
+
+### Does this approach need a new type of a token contract standard, or is a basic ERC-20 enough?
+
+This approach would need a new token standard (which can be backwards compatible with ERC-20) that would allow relayers to change the token amount for users under the condition the meta tx signatures (made by original senders) are valid. This way meta tx senders don't need to trust relayers.
+
+### Is it possible to somehow use the existing ERC-20 token contracts?
+
+This might be possible if all relayers make the onchain transactions via a special smart contract (which then sends multiple txs to token smart contracts). But this special smart contract would need to have a token spending approval from every user (for each token separately), which would need to be done onchain.
