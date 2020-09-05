@@ -1,16 +1,16 @@
 # A proof-of-concept for batching meta transactions
 
-When you say "meta transactions" people think of **gasless** transactions, which means that someone else (the relayer) makes an onchain token transaction for you and pays for it in Ether. In return, you can pay the relayer in tokens (instead of Ether).
+When you say "meta transactions" people think of **gasless** transactions, which means that someone else (the relayer) makes an on-chain token transaction for you and pays for it in Ether. In return, you can pay the relayer in tokens (instead of Ether).
 
-The problem with the current implementation of meta transactions is that it allows the relayer to **relay only one meta tx at a time**. While this allows the original (meta) tx sender to avoid using ETH, it doesn't lower the transaction cost for her/him, because the relayer has to be compensated in tokens in approx. the same (or higher) value as the gas fees for the onchain transaction.
+The problem with the current implementation of meta transactions is that it allows the relayer to **relay only one meta tx at a time**. While this allows the original (meta) tx sender to avoid using ETH, it doesn't lower the transaction cost for her/him, because the relayer has to be compensated in tokens in approx. the same (or higher) value as the gas fees for the on-chain transaction.
 
-The solution is to **batch multiple meta transactions** into **one onchain transaction**.
+The solution is to **batch multiple meta transactions** into **one on-chain transaction**.
 
 This would **lower the cost** of a meta tx which should be the main purpose of using meta transactions.
 
 ## The implementation
 
-The implementation should be pretty straightforward. A user sends a meta transaction to a relayer. Relayer waits for multiple meta txs to come up in a mempool until the meta tx fees (at least) cover the cost of the onchain gas fee.
+The implementation should be pretty straightforward. A user sends a meta transaction to a relayer. Relayer waits for multiple meta txs to come up in a mempool until the meta tx fees (at least) cover the cost of the on-chain gas fee.
 
 ### What if the relayer forges a meta tx?
 
@@ -41,9 +41,9 @@ Every time a meta transaction is completed, the smart contract should update the
 
 ### How is the data (about meta txs) sent to the smart contract?
 
-When a relayer receives multiple meta txs and decides to make a batch onchain transaction, the data needs to be sent to the smart contract in a way that takes the least amount of gas.
+When a relayer receives multiple meta txs and decides to make a batch on-chain transaction, the data needs to be sent to the smart contract in a way that takes the least amount of gas.
 
-In web development, the data would be sent in a JSON format. But since Solidity does not have a JSON parser (and parsing data onchain would also be quite expensive), the data could be sent as arrays instead (to avoid parsing a huge string of data).
+In web development, the data would be sent in a JSON format. But since Solidity does not have a JSON parser (and parsing data on-chain would also be quite expensive), the data could be sent as arrays instead (to avoid parsing a huge string of data).
 
 Currently, it seems that the best approach is the one that is used by [Disperse](https://github.com/banteg/disperse-research/blob/master/contracts/Disperse.sol), which means sending each type of meta data as a **separate array**. One array would consist of sender addresses, the other of receiver addresses, and then 5 more arrays for a token amount, a relayer fee, a nonce, a hash (bytes32 array) and a signature (bytes32 array).
 
@@ -69,11 +69,11 @@ The meta tx sender defines how big fee they want to pay to the relayer.
 
 ### How can the sender know which relayer to pay the fee to?
 
-The sender does not know that because there are probably multiple relayers that can pick the meta tx and relay it onchain.
+The sender does not know that because there are probably multiple relayers that can pick the meta tx and relay it on-chain.
 
-Instead, the token smart contract will take care of this. The smart contract knows who the relayer is (`msg.sender`) and can then give the relayer the appropriate amount of tokens based on all the relayer fees in all the meta txs (in that onchain tx).
+Instead, the token smart contract will take care of this. The smart contract knows who the relayer is (`msg.sender`) and can then give the relayer the appropriate amount of tokens based on all the relayer fees in all the meta txs (in that on-chain tx).
 
-### Can a relayer pass meta transactions to different token contracts in one onchain tx?
+### Can a relayer pass meta transactions to different token contracts in one on-chain tx?
 
 Not sure about that, probably not. But if we're talking about a token that has a lot of transactions, this shouldn't be a problem. Otherwise the relayer might want to wait longer until the sufficient amount of meta txs (for a certain token) join the mempool.
 
@@ -101,9 +101,17 @@ Note that the image above is a simplified overview that's missing some crucial i
 
 - meta txs first go to a mempool from where they are picked by relayers
 - every meta tx is digitally signed by a user (using their Ethereum private key)
-- relayer parses meta txs and sends the data onchain in a form of multiple data arrays as smart contract function parameters
+- relayer parses meta txs and sends the data on-chain in a form of multiple data arrays as smart contract function parameters
 - the smart contract checks the validity of each meta tx (checks a signature)
 
 ### Is it possible to somehow use the existing ERC-20 token contracts?
 
-This might be possible if all relayers make the onchain transactions via a special smart contract (which then sends multiple txs to token smart contracts). But this special smart contract would need to have a token spending approval from every user (for each token separately), which would need to be done onchain.
+This might be possible if all relayers make the on-chain transactions via a special smart contract (which then sends multiple txs to token smart contracts). But this special smart contract would need to have a token spending approval from every user (for each token separately), which would need to be done on-chain.
+
+In this case, the process would look like this:
+
+![](meta-txs-via-relayer-smart-contract-part-1.png)
+
+![](meta-txs-via-relayer-smart-contract-part-2.png)
+
+The disadvantage of this process is that a user first needs to do an on-chain transaction, before being able to do off-chain meta transactions. But luckily, the on-chain transaction needs to be made only once per token (if the allowance amount is unlimited, of course).
