@@ -49,6 +49,20 @@ Currently, it seems that the best approach is the one that is used by [Disperse]
 
 The crucial part here is that the data in arrays must be in the **correct order**. If the ordering is wrong, the smart contract would notice that (because hashes wouldn't match) and abort the change.
 
+Example:
+
+```solidity
+function transferMetaBatch(address[] memory senders, 
+                           address[] memory recipients, 
+                           uint256[] memory amounts,
+                           uint256[] memory relayer_fees,
+                           uint256[] memory nonces,
+                           bytes32[] memory hashes,
+                           bytes32[] memory signatures) public returns (bool) {
+    //... function code ...
+}
+```
+
 ### What is the relayer fee?
 
 The meta tx sender defines how big fee they want to pay to the relayer.
