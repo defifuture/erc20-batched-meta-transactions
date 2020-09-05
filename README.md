@@ -79,6 +79,17 @@ This proof-of-concept only targets the basic token transfer functionality, so th
 
 This approach would need a new token standard (which can be backwards compatible with ERC-20) that would allow relayers to change the token amount for users under the condition the meta tx signatures (made by original senders) are valid. This way meta tx senders don't need to trust relayers.
 
+Here's an image how the whole system (using a **new** token standard) would work:
+
+![](meta-txs-directly-to-token-smart-contract.png)
+
+Note that the image above is a simplified overview that's missing some crucial information like:
+
+- meta txs first go to a mempool from where they are picked by relayers
+- every meta tx is digitally signed by a user (using their Ethereum private key)
+- relayer parses meta txs and sends the data onchain in a form of multiple data arrays as smart contract function parameters
+- the smart contract checks the validity of each meta tx (checks a signature)
+
 ### Is it possible to somehow use the existing ERC-20 token contracts?
 
 This might be possible if all relayers make the onchain transactions via a special smart contract (which then sends multiple txs to token smart contracts). But this special smart contract would need to have a token spending approval from every user (for each token separately), which would need to be done onchain.
