@@ -1,4 +1,4 @@
-# A proof-of-concept for batching meta transactions
+# A proof-of-concept for batching meta transactions from multiple users
 
 ## The problem
 
