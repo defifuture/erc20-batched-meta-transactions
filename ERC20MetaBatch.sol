@@ -61,7 +61,7 @@ contract ERC20MetaBatch is Context, IERC20 {
     }
 
     /**
-     * @dev Batch token transfers using meta txs
+     * @dev Process meta txs batch
      */
     function transferMetaBatch(address[] memory senders,
                                address[] memory recipients,
@@ -80,11 +80,13 @@ contract ERC20MetaBatch is Context, IERC20 {
             require(senders[i] != address(0), "ERC20MetaBatch: Transfer from the zero address does not work.");
 
             // check if the hash is correct
-            require(hashes[i] == keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayer_fees[i], nonces[i])), "ERC20MetaBatch: Hash does not match.");
+            bytes32 msgHash = keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayer_fees[i], nonces[i]));
+            require(hashes[i] == msgHash, "ERC20MetaBatch: Hash does not match.");
 
             // check if the signature is correct (ecrecover returns the meta tx sender's address)
-            // this part needs work, a standard message header needs to be added, otherwise verification fails
-            require(senders[i] == ecrecover(hashes[i], sigV[i], sigR[i], sigS[i]), "ERC20MetaBatch: Signature is not valid.");
+            // TODO: this part needs work, signature verification is still failing
+            bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+            require(senders[i] == ecrecover(keccak256(abi.encodePacked(prefix, hashes[i])), sigV[i], sigR[i], sigS[i]), "ERC20MetaBatch: Signature is not valid.");
 
             // check if the nonce is bigger than the previous one
             require(nonces[i] > nonceOf(senders[i]), "ERC20MetaBatch: The meta tx nonce is not bigger than the previous one.");
@@ -92,17 +94,25 @@ contract ERC20MetaBatch is Context, IERC20 {
             // set the a new nonce for the sender
             _metaNonces[senders[i]] = nonces[i];
 
-            // subtract the token amount AND the relayer fee from the senders account
-            _balances[senders[i]] = _balances[senders[i]].sub((amounts[i]+relayer_fees[i]), "ERC20MetaBatch: transfer amount exceeds balance.");
-
-            // add tokens to the recipient's account
-            _balances[recipients[i]] = _balances[recipients[i]].add(amounts[i]);
-
-            // pay relayer fee to the relayer's account
-            _balances[msg.sender] = _balances[msg.sender].add(relayer_fees[i]);
+            // call the _metaTokenTransfers function
+            _metaTokenTransfers(senders[i], recipients[i], amounts[i], relayer_fees[i]);
         }
 
         return true;
+    }
+
+    // token transfers are separated from the transferMetaBatch function in order to reduce the stack (and avoid the "Stack Too Deep" error)
+    function _metaTokenTransfers(address sender, address recipient, uint256 amount, uint256 relayer_fee) internal {
+        uint256 totalAmount = amount.add(relayer_fee);
+
+        // subtract the token amount AND the relayer fee from the senders account
+        _balances[sender] = _balances[sender].sub(totalAmount, "ERC20MetaBatch: transfer amount exceeds balance.");
+
+        // add tokens to the recipient's account
+        _balances[recipient] = _balances[recipient].add(amount);
+
+        // pay relayer fee to the relayer's account
+        _balances[msg.sender] = _balances[msg.sender].add(relayer_fee);
     }
 
 
