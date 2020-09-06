@@ -115,3 +115,8 @@ In this case, the process would look like this:
 ![](meta-txs-via-relayer-smart-contract-part-2.png)
 
 The disadvantage of this process is that a user first needs to do an on-chain transaction, before being able to do off-chain meta transactions. But luckily, the on-chain transaction needs to be made only once per token (if the allowance amount is unlimited, of course).
+
+### How to handle the burn address (0x0)
+
+The burn address should be able to **receive** tokens, but it must **not be able to send** tokens (as [suggested here](https://github.com/ethereum/EIPs/issues/1776#issuecomment-467460341)).
+
