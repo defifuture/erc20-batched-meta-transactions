@@ -35,6 +35,12 @@ Perhaps the easiest would be to keep a **separate mapping for nonces** only:
 mapping(address => uint256) private __nonceOf;
 ```
 
+Another option is to have a 2D array of a token value and a meta tx nonce (mapped to user's address):
+
+```solidity
+mapping(address => mapping(uint256 => uint256)) private __balanceOf;  # mapping of address => tokenAmount => metaTxNonce
+```
+
 Every time a meta transaction is completed, the smart contract should update the latest nonce in the mapping. The rule should be that a new meta tx must not have a nonce lower than the previous meta tx (of the same user/address). This way it's easier to check the validity of nonces.
 
 ### What data is needed in a meta tx?
