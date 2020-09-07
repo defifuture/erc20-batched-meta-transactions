@@ -129,7 +129,7 @@ This approach would need a **extended ERC-20 token standard** (we could call it 
 
 Here's an image how the whole system (using ERC20MetaBatch token standard) would work:
 
-![](meta-txs-directly-to-token-smart-contract.png)
+![](img/meta-txs-directly-to-token-smart-contract.png)
 
 Note that the image above is a simplified overview that's missing some crucial information like:
 
@@ -144,9 +144,9 @@ This might be possible if all relayers make the on-chain transactions via a spec
 
 In this case, the process would look like this:
 
-![](meta-txs-via-relayer-smart-contract-part-1.png)
+![](img/meta-txs-via-relayer-smart-contract-part-1.png)
 
-![](meta-txs-via-relayer-smart-contract-part-2.png)
+![](img/meta-txs-via-relayer-smart-contract-part-2.png)
 
 The disadvantage of this process is that a user first needs to do an on-chain transaction, before being able to do off-chain meta transactions. But luckily, the on-chain transaction needs to be made only once per token (if the allowance amount is unlimited, of course).
 

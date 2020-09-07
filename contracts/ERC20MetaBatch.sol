@@ -43,9 +43,9 @@ contract ERC20MetaBatch is Context, IERC20 {
     string private _symbol;
     uint8 private _decimals;
 
-    constructor (string memory name, string memory symbol) public {
-        _name = name;
-        _symbol = symbol;
+    constructor () public {
+        _name = "Meta Tx Token";
+        _symbol = "MTT";
         _decimals = 18;
 
         _balances[msg.sender] = _totalSupply;  // give all tokens to the smart contract deployer
