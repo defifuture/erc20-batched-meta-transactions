@@ -115,9 +115,9 @@ This proof-of-concept only targets the basic token transfer functionality, so th
 
 ### Does this approach need a new type of a token contract standard, or is a basic ERC-20 enough?
 
-This approach would need a new token standard (which can be backwards compatible with ERC-20) that would allow relayers to change the token amount for users under the condition the meta tx signatures (made by original senders) are valid. This way meta tx senders don't need to trust relayers.
+This approach would need a **extended ERC-20 token standard** (we could call it **ERC20MetaBatch**). This basically means adding a couple of new functions to ERC-20 that would allow relayers to change the token amount for users under the condition the meta tx signatures (made by original senders) are valid. This way meta tx senders don't need to trust relayers.
 
-Here's an image how the whole system (using a **new** token standard) would work:
+Here's an image how the whole system (using ERC20MetaBatch token standard) would work:
 
 ![](meta-txs-directly-to-token-smart-contract.png)
 
@@ -140,7 +140,12 @@ In this case, the process would look like this:
 
 The disadvantage of this process is that a user first needs to do an on-chain transaction, before being able to do off-chain meta transactions. But luckily, the on-chain transaction needs to be made only once per token (if the allowance amount is unlimited, of course).
 
+### How about the `permit()` function?
+
+`permit()` is a very nice function that provides a new functionality to the ERC-20 standard - Basically it means that a user can give a **token-spending approval** to someone else using a **meta transaction** (off-chain). This solves the problem from the previous question (a user having to make an on-chain approval transaction).
+
+For more information see [EIP-2612: permit – 712-signed approvals](https://eips.ethereum.org/EIPS/eip-2612).
+
 ### How to handle the burn address (0x0)
 
 The burn address should be able to **receive** tokens, but it must **not be able to send** tokens (as [suggested here](https://github.com/ethereum/EIPs/issues/1776#issuecomment-467460341)).
-
