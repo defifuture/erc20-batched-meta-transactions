@@ -109,6 +109,16 @@ As a solution, there could be nodes that only serve as mempool holders. Not sure
 
 Another option could be that the meta tx sender sends the meta tx to many relayers at once.
 
+### What if there's a meta tx in a relayer's batch that was already sent on-chain by some other relayer?
+
+First of all, the on-chain transaction as a whole should not fail in this case. The already commited meta tx should just be ignored by the smart contract processing the batch. The other (not-yet-commited) meta txs should go through.
+
+Secondly, some people have pointed out the lost revenue that a relayer has if one or more meta txs in their batch were already spent. While this is true, I don't think those relayers should be compensated for lost meta tx fees (as some have proposed). The problem is that if they are compensated, the relayers would try to take advantage of this and start to intentially include already spent meta txs in their batches.
+
+Instead, the solution to this problem should be done on the relayer network level. One option is to solve this issue in the mempool. The mempool could have threads (or queues) - one for each relayer. Mempool would then act as a load balancer, transfering meta txs equally to each queue. 
+
+This would not prevent a relayer from taking a meta tx from another queue - in fact, if a relayer sees that another relayer is ignoring/censoring a meta tx, they should be encouraged to pick that meta tx up (or a mempool could automatically reassign the meta tx to someone else after some time). But in case a relayer acts maliciously and is "stealing" meta txs from other queues, other relayers could kick that relayer out of the network.
+
 ### What about approve and allowance?
 
 This proof-of-concept only targets the basic token transfer functionality, so the approve txs are not needed here (might be added later). But it should work in a similar way.
