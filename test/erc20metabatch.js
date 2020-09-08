@@ -2,46 +2,88 @@ const ERC20MetaBatch = artifacts.require("ERC20MetaBatch");
 
 contract("ERC20MetaBatch", async accounts => {
 
-    // test the name() function
-    it("should return token name", async () => {
+    it("should return a token name", async () => {
         let instance = await ERC20MetaBatch.deployed();
         let name = await instance.name();
-        console.log("Contract name: " + name);
+        //console.log("Contract name: " + name);
         assert.equal(name, "Meta Tx Token");
     });
 
-    // send some ether to another address
-    it("should make the contract deployer send some ETH to another address", async() => {
+    it("should check how much tokens the contract deployer has", async() => {
+        let instance = await ERC20MetaBatch.deployed();
+        let contractDeployer = accounts[0];
+
+        let deployerBalance = await instance.balanceOf(contractDeployer);
+        assert.equal(deployerBalance, 10*1000*1000);
+    });
+
+    it("should send tokens from one address to another", async() => {
+        let instance = await ERC20MetaBatch.deployed();
         let sender = accounts[0];
         let receiver = accounts[1];
-        let amount = web3.utils.toWei("1", 'ether')
+        
+        let amount = 50;
+        //console.log("Token amount: " + amount);
 
-        console.log("Sender: " + sender);
-        console.log("Receiver: " + receiver);
-        console.log("Amount: " + amount + " WEI");
+        let result = await instance.transfer(receiver, amount);
 
-        let balanceSender = await web3.eth.getBalance(sender);
-        console.log("Sender balance: " + balanceSender);
+        let balanceReceiver = await instance.balanceOf(receiver);
+        assert.equal(balanceReceiver, 50)
+    });
 
-        let balanceReceiverBefore = await web3.eth.getBalance(receiver);
-        console.log("Receiver balance (before): " + balanceReceiverBefore);
+    it("should send a batch of meta txs", async() => {
+        let instance = await ERC20MetaBatch.deployed();
 
-        let tx = {
-            from: sender,
-            to: receiver,
-            value: amount,
-            gasPrice: web3.utils.toBN(20000000000),
-            gas: web3.utils.toBN(6721975)
-        };
+        let account_one = accounts[0];  // relayer
+        let account_two = accounts[1];  // meta tx sender
+        let account_three = accounts[2];  // final token receiver
 
-        let result = await web3.eth.sendTransaction(tx);
-        // console.log(result);
+        let amount = 10;
+        let relayerFee = 1;
 
-        let balanceReceiverAfter = await web3.eth.getBalance(receiver);
-        console.log("Receiver balance (after): " + balanceReceiverAfter);
+        let lastNonce = await instance.nonceOf(account_two);
+        //console.log(parseInt(lastNonce));
 
-        // assert that the receiver's balance has increased by 1 ETH
-        assert.equal(amount, balanceReceiverAfter-balanceReceiverBefore);
+        let newNonce = parseInt(lastNonce) + 1;
+        //console.log(newNonce);
+
+        // create a hash of both addresses, the token amount, the fee and the nonce
+        let valuesEncoded = web3.eth.abi.encodeParameters(['address','address', 'uint256', 'uint256', 'uint256'], 
+                                                          [account_two, account_three, amount, relayerFee, newNonce]);
+        //console.log("Values encoded: " + valuesEncoded);
+        let hash = web3.utils.keccak256(valuesEncoded);
+        //console.log(hash);
+
+        // TODO: create a signature
+        let v = 22;
+        let r = web3.utils.stringToHex("");
+        console.log(r);
+
+        let s = web3.utils.randomHex(0);
+        console.log(s);
+
+        // Make sure the second account still has 50 tokens (from the previous test)
+        let balanceTwo = await instance.balanceOf(account_two);
+        assert.equal(parseInt(balanceTwo), 50);
+
+        // send meta batch tx
+        let result = await instance.transferMetaBatch([account_two],
+                                                      [account_three],
+                                                      [amount],
+                                                      [relayerFee],
+                                                      [newNonce],
+                                                      [hash],
+                                                      [v],
+                                                      [r],
+                                                      [s]);
+        //console.log(result);
+
+        // Second account still should now have 39 tokens
+        balanceTwo = await instance.balanceOf(account_two);
+        assert.equal(parseInt(balanceTwo), 39);
+
+        let balanceThree = await instance.balanceOf(account_three);
+        assert.equal(parseInt(balanceThree), 10);
     });
 
 });
