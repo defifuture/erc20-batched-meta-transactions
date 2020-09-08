@@ -20,7 +20,7 @@ This would **lower the cost** of a meta tx for a common user.
 
 The implementation should be pretty straightforward. A user sends a meta transaction to a relayer. Relayer waits for multiple meta txs to come up in a mempool until the meta tx fees (at least) cover the cost of the on-chain gas fee.
 
-You can see the basic proof-of-concept in this file: [ERC20MetaBatch.sol](https://github.com/defifuture/batching-meta-transactions/blob/master/ERC20MetaBatch.sol). This is an extended ERC-20 contract with an added meta tx batch transfer capabilities (see function `transferMetaBatch()`).
+You can see the basic proof-of-concept in this file: [ERC20MetaBatch.sol](https://github.com/defifuture/batching-meta-transactions/blob/master/contracts/ERC20MetaBatch.sol). This is an extended ERC-20 contract with an added meta tx batch transfer capabilities (see function `transferMetaBatch()`).
 
 ### What if the relayer forges a meta tx?
 
