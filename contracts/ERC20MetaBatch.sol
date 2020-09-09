@@ -80,7 +80,7 @@ contract ERC20MetaBatch is Context, IERC20 {
 
             // check if the hash is correct
             bytes32 msgHash = keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayer_fees[i], nonces[i]));
-            require(hashes[i] == msgHash, "ERC20MetaBatch: Hash does not match.");
+            require(hashes[i] == msgHash, "ERC20MetaBatch: Hashes do not match.");
 
             // check if the signature is correct (ecrecover returns the meta tx sender's address)
             // TODO: this part needs work, signature verification is still failing

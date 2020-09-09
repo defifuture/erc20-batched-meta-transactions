@@ -57,10 +57,10 @@ contract("ERC20MetaBatch", async accounts => {
         // create a signature
         let metaSig = await web3.eth.accounts.sign(hash, account_two);
         console.log("metaSig message: " + metaSig.message);
-        console.log("metaSig message length: " + metaSig.message.length);
+        console.log("metaSig message hash: " + metaSig.messageHash);
         console.log("r: " + metaSig.r);
         console.log("s: " + metaSig.s);
-        console.log("v: " + metaSig.v);
+        console.log("v: " + web3.utils.hexToNumber(metaSig.v));
 
         // Make sure the second account still has 50 tokens (from the previous test)
         let balanceTwo = await instance.balanceOf(account_two);
@@ -73,7 +73,7 @@ contract("ERC20MetaBatch", async accounts => {
                                                       [relayerFee],
                                                       [newNonce],
                                                       [hash],
-                                                      [metaSig.v],
+                                                      [web3.utils.hexToNumber(metaSig.v)],
                                                       [metaSig.r],
                                                       [metaSig.s]);
         //console.log(result);
