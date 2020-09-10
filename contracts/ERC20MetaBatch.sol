@@ -43,7 +43,7 @@ contract ERC20MetaBatch is Context, IERC20 {
     string private _symbol;
     uint8 private _decimals;
 
-    constructor () public {
+    constructor() public {
         _name = "Meta Tx Token";
         _symbol = "MTT";
         _decimals = 18;
@@ -75,21 +75,32 @@ contract ERC20MetaBatch is Context, IERC20 {
 
         // loop through all meta txs
         for (uint256 i = 0; i < senders.length; i++) {
-            // do not send tokens FROM the 0x0 address
-            require(senders[i] != address(0), "ERC20MetaBatch: Transfer from the zero address does not work.");
+            if(senders[i] == address(0)) {
+                continue; // don't allow transfers from 0x0, so skip this meta tx and go to the next one
+            }
+
+            // check if the nonce is bigger than the previous one
+            if(nonces[i] <= nonceOf(senders[i])) {
+                continue; // if nonce is not bigger than the previous (for the same sender), skip this meta tx
+            }
+
+            if(_balances[senders[i]] < (amounts[i] + relayer_fees[i])) {
+                continue; // if sender's balance is less than the amount and the relayer fee, skip this meta tx
+            }
 
             // check if the hash is correct
             bytes32 msgHash = keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayer_fees[i], nonces[i]));
-            require(hashes[i] == msgHash, "ERC20MetaBatch: Hashes do not match.");
+            if(hashes[i] != msgHash) {
+                continue; // if hashes don't match, skip to the next meta tx
+            }
 
             // check if the signature is correct (ecrecover returns the meta tx sender's address)
             bytes memory prefix = "\x19Ethereum Signed Message:\n32";
-            require(senders[i] == ecrecover(keccak256(abi.encodePacked(prefix, hashes[i])), sigV[i], sigR[i], sigS[i]), "ERC20MetaBatch: Signature is not valid.");
+            if(senders[i] != ecrecover(keccak256(abi.encodePacked(prefix, hashes[i])), sigV[i], sigR[i], sigS[i])) {
+                continue; // if sig is not valid, skip to the next meta tx
+            }
 
-            // check if the nonce is bigger than the previous one
-            require(nonces[i] > nonceOf(senders[i]), "ERC20MetaBatch: The meta tx nonce is not bigger than the previous one.");
-
-            // set the a new nonce for the sender
+            // set a new nonce for the sender
             _metaNonces[senders[i]] = nonces[i];
 
             // call the _metaTokenTransfers function
