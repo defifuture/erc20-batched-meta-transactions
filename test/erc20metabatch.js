@@ -52,15 +52,16 @@ contract("ERC20MetaBatch", async accounts => {
                                                           [account_two, account_three, amount, relayerFee, newNonce]);
         //console.log("Values encoded: " + valuesEncoded);
         let hash = web3.utils.keccak256(valuesEncoded);
-        console.log("Hash: " + hash);
+        // console.log("Hash: " + hash);
 
         // create a signature
-        let metaSig = await web3.eth.accounts.sign(hash, account_two);
-        console.log("metaSig message: " + metaSig.message);
-        console.log("metaSig message hash: " + metaSig.messageHash);
-        console.log("r: " + metaSig.r);
-        console.log("s: " + metaSig.s);
-        console.log("v: " + web3.utils.hexToNumber(metaSig.v));
+        let signature = await web3.eth.sign(hash, account_two);
+
+        let r = signature.slice(0, 66);
+        let s = "0x" + signature.slice(66, 130);
+        let v = "0x" + signature.slice(130, 132);
+        v = web3.utils.toDecimal(v);
+        v = v + 27;
 
         // Make sure the second account still has 50 tokens (from the previous test)
         let balanceTwo = await instance.balanceOf(account_two);
@@ -73,12 +74,12 @@ contract("ERC20MetaBatch", async accounts => {
                                                       [relayerFee],
                                                       [newNonce],
                                                       [hash],
-                                                      [web3.utils.hexToNumber(metaSig.v)],
-                                                      [metaSig.r],
-                                                      [metaSig.s]);
-        //console.log(result);
+                                                      [v],
+                                                      [r],
+                                                      [s]);
+        // console.log(result);
 
-        // Second account still should now have 39 tokens
+        // Second account still should now have 39 tokens (50 - 10 - 1)
         balanceTwo = await instance.balanceOf(account_two);
         assert.equal(parseInt(balanceTwo), 39);
 
