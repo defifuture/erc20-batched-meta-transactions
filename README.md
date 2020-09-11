@@ -154,7 +154,23 @@ The disadvantage of this process is that a user first needs to do an on-chain tr
 
 `permit()` is a very nice function that provides a new functionality to the ERC-20 standard - Basically it means that a user can give a **token-spending approval** to someone else using a **meta transaction** (off-chain). This solves the problem from the **previous question** (a user having to make an on-chain approval transaction first).
 
-For more information see [EIP-2612: permit – 712-signed approvals](https://eips.ethereum.org/EIPS/eip-2612).
+> For more information see [EIP-2612: permit – 712-signed approvals](https://eips.ethereum.org/EIPS/eip-2612).
+
+There are two ways of using permits:
+
+- Sending a permit meta tx and a transfer meta tx in **two separate** on-chain txs
+- Sending a permit meta tx and a transfer meta tx in **the same** on-chain tx
+
+More often it would be better to do it in a single on-chain tx (lower tx cost), but there may be cases where two separate on-chain txs make more sense.
+
+#### Two separate transactions
+
+![](img/meta-txs-permit-relayer-two-steps-1.png)
+![](img/meta-txs-permit-relayer-two-steps-2.png)
+
+#### Single transaction
+
+![](img/meta-txs-permit-relayer-single-step.png)
 
 ### How to handle the burn address (0x0)
 
