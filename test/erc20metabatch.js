@@ -34,28 +34,28 @@ contract("ERC20MetaBatch", async accounts => {
     it("should send a meta tx batch - single tx (valid)", async() => {
         let instance = await ERC20MetaBatch.deployed();
 
-        let account_one = accounts[0];  // relayer
-        let account_two = accounts[1];  // meta tx sender
-        let account_three = accounts[2];  // final token receiver
+        let accountOne = accounts[0];  // relayer
+        let accountTwo = accounts[1];  // meta tx sender
+        let accountThree = accounts[2];  // final token receiver
 
         let amount = 10;
         let relayerFee = 1;
 
-        let lastNonce = await instance.nonceOf(account_two);
+        let lastNonce = await instance.nonceOf(accountTwo);
         //console.log(parseInt(lastNonce));
 
         let newNonce = parseInt(lastNonce) + 1;
         //console.log(newNonce);
 
         // create a hash of both addresses, the token amount, the fee and the nonce
-        let valuesEncoded = web3.eth.abi.encodeParameters(['address','address', 'uint256', 'uint256', 'uint256'], 
-                                                          [account_two, account_three, amount, relayerFee, newNonce]);
+        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address'], 
+                                                          [accountTwo, accountThree, amount, relayerFee, newNonce, instance.address]);
         //console.log("Values encoded: " + valuesEncoded);
         let hash = web3.utils.keccak256(valuesEncoded);
         // console.log("Hash: " + hash);
 
         // create a signature
-        let signature = await web3.eth.sign(hash, account_two);
+        let signature = await web3.eth.sign(hash, accountTwo);
 
         let r = signature.slice(0, 66);
         let s = "0x" + signature.slice(66, 130);
@@ -64,58 +64,58 @@ contract("ERC20MetaBatch", async accounts => {
         v = v + 27;
 
         // Make sure the second account still has 50 tokens (from the previous test)
-        let balanceTwo = await instance.balanceOf(account_two);
+        let balanceTwo = await instance.balanceOf(accountTwo);
         assert.equal(parseInt(balanceTwo), 50);
 
         // send meta batch tx
-        let result = await instance.transferMetaBatch([account_two],
-                                                      [account_three],
+        let result = await instance.transferMetaBatch([accountTwo],
+                                                      [accountThree],
                                                       [amount],
                                                       [relayerFee],
                                                       [newNonce],
-                                                      [hash],
+                                                      [instance.address],
                                                       [v],
                                                       [r],
                                                       [s]);
         // console.log(result);
 
         // Second account should now have 39 tokens (50 - 10 - 1)
-        balanceTwo = await instance.balanceOf(account_two);
+        balanceTwo = await instance.balanceOf(accountTwo);
         assert.equal(parseInt(balanceTwo), 39);
 
         // third account should have 10 tokens
-        let balanceThree = await instance.balanceOf(account_three);
+        let balanceThree = await instance.balanceOf(accountThree);
         assert.equal(parseInt(balanceThree), 10);
     });
 
     it("should send a meta tx batch - multiple meta txs (all valid)", async() => {
         let instance = await ERC20MetaBatch.deployed();
 
-        let account_one = accounts[0];  // relayer
-        let account_two = accounts[1];  // meta tx sender
-        let account_three = accounts[2];  // meta tx sender
-        let account_four = accounts[3];  // token receiver
-        let account_five = accounts[4];  // token receiver
+        letO = accounts[0];  // relayer
+        let accountTwo = accounts[1];  // meta tx sender
+        let accountThree = accounts[2];  // meta tx sender
+        let accountFour = accounts[3];  // token receiver
+        let accountFive = accounts[4];  // token receiver
 
-        // START META TX 1 (account_two --> account_four)
+        // START META TX 1 (accountTwo --> accountFour)
         let amount1 = 8;
         let relayerFee1 = 1;
 
-        let lastNonceAccountTwo = await instance.nonceOf(account_two);
+        let lastNonceAccountTwo = await instance.nonceOf(accountTwo);
         //console.log(parseInt(lastNonceAccountTwo));
 
         let newNonceAccountTwo = parseInt(lastNonceAccountTwo) + 1;
         //console.log(newNonceAccountTwo);
 
         // create a hash of both addresses, the token amount, the fee and the nonce
-        let valuesEncoded1 = web3.eth.abi.encodeParameters(['address','address', 'uint256', 'uint256', 'uint256'], 
-                                                           [account_two, account_four, amount1, relayerFee1, newNonceAccountTwo]);
+        let valuesEncoded1 = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address'], 
+                                                           [accountTwo, accountFour, amount1, relayerFee1, newNonceAccountTwo, instance.address]);
         //console.log("Values encoded: " + valuesEncoded1);
         let hash1 = web3.utils.keccak256(valuesEncoded1);
         // console.log("Hash: " + hash1);
 
         // create a signature
-        let signature = await web3.eth.sign(hash1, account_two);
+        let signature = await web3.eth.sign(hash1, accountTwo);
 
         let r1 = signature.slice(0, 66);
         let s1 = "0x" + signature.slice(66, 130);
@@ -124,41 +124,41 @@ contract("ERC20MetaBatch", async accounts => {
         v1 = v1 + 27;
 
         let meta_tx_one = {
-            sender: account_two,
-            receiver: account_four,
+            sender: accountTwo,
+            receiver: accountFour,
             amount: amount1,
             relayerFee: relayerFee1,
             nonce: newNonceAccountTwo,
-            hash: hash1,
+            tokenAddress: instance.address,
             v: v1,
             r: r1,
             s: s1
         }
 
         // Make sure the second account still has 39 tokens (from the previous test)
-        let balanceTwo = await instance.balanceOf(account_two);
+        let balanceTwo = await instance.balanceOf(accountTwo);
         assert.equal(parseInt(balanceTwo), 39);
         // END META TX 1
 
-        // START META TX 2 (account_three --> account_five)
+        // START META TX 2 (accountThree --> accountFive)
         let amount2 = 3;
         let relayerFee2 = 1;
 
-        let lastNonceAccountThree = await instance.nonceOf(account_three);
+        let lastNonceAccountThree = await instance.nonceOf(accountThree);
         //console.log(parseInt(lastNonceAccountThree));
 
         let newNonceAccountThree = parseInt(lastNonceAccountThree) + 1;
         //console.log(newNonceAccountThree);
 
         // create a hash of both addresses, the token amount, the fee and the nonce
-        let valuesEncoded2 = web3.eth.abi.encodeParameters(['address','address', 'uint256', 'uint256', 'uint256'], 
-                                                           [account_three, account_five, amount2, relayerFee2, newNonceAccountThree]);
+        let valuesEncoded2 = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address'], 
+                                                           [accountThree, accountFive, amount2, relayerFee2, newNonceAccountThree, instance.address]);
         //console.log("Values encoded: " + valuesEncoded2);
         let hash2 = web3.utils.keccak256(valuesEncoded2);
         // console.log("Hash: " + hash2);
 
         // create a signature
-        let signature2 = await web3.eth.sign(hash2, account_three);
+        let signature2 = await web3.eth.sign(hash2, accountThree);
 
         let r2 = signature2.slice(0, 66);
         let s2 = "0x" + signature2.slice(66, 130);
@@ -167,19 +167,19 @@ contract("ERC20MetaBatch", async accounts => {
         v2 += 27;
 
         let meta_tx_two = {
-            sender: account_three,
-            receiver: account_five,
+            sender: accountThree,
+            receiver: accountFive,
             amount: amount2,
             relayerFee: relayerFee2,
             nonce: newNonceAccountThree,
-            hash: hash2,
+            tokenAddress: instance.address,
             v: v2,
             r: r2,
             s: s2
         }
 
         // Make sure the third account still has 10 tokens (from the previous test)
-        let balanceThree = await instance.balanceOf(account_three);
+        let balanceThree = await instance.balanceOf(accountThree);
         assert.equal(parseInt(balanceThree), 10);
         // END META TX 2
 
@@ -189,26 +189,26 @@ contract("ERC20MetaBatch", async accounts => {
                                                       [meta_tx_one.amount, meta_tx_two.amount],
                                                       [meta_tx_one.relayerFee, meta_tx_two.relayerFee],
                                                       [meta_tx_one.nonce, meta_tx_two.nonce],
-                                                      [meta_tx_one.hash, meta_tx_two.hash],
+                                                      [meta_tx_one.tokenAddress, meta_tx_two.tokenAddress],
                                                       [meta_tx_one.v, meta_tx_two.v],
                                                       [meta_tx_one.r, meta_tx_two.r],
                                                       [meta_tx_one.s, meta_tx_two.s]);
         // console.log(result);
 
         // Second account should now have 30 tokens (39 - 9)
-        balanceTwo = await instance.balanceOf(account_two);
+        balanceTwo = await instance.balanceOf(accountTwo);
         assert.equal(parseInt(balanceTwo), 30);
 
         // Third account should now have 6 tokens (10 - 4)
-        balanceThree = await instance.balanceOf(account_three);
+        balanceThree = await instance.balanceOf(accountThree);
         assert.equal(parseInt(balanceThree), 6);
 
         // Fourth account should now have 8 tokens
-        let balanceFour = await instance.balanceOf(account_four);
+        let balanceFour = await instance.balanceOf(accountFour);
         assert.equal(parseInt(balanceFour), 8);
 
         // Fifth account should now have 3 tokens
-        let balanceFive = await instance.balanceOf(account_five);
+        let balanceFive = await instance.balanceOf(accountFive);
         assert.equal(parseInt(balanceFive), 3);
     });
 

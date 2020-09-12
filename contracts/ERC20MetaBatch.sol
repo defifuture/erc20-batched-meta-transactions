@@ -66,37 +66,36 @@ contract ERC20MetaBatch is Context, IERC20 {
     function transferMetaBatch(address[] memory senders,
                                address[] memory recipients,
                                uint256[] memory amounts,
-                               uint256[] memory relayer_fees,
+                               uint256[] memory relayerFees,
                                uint256[] memory nonces,
-                               bytes32[] memory hashes,
+                               address[] memory tokenAddresses,
                                uint8[] memory sigV,
                                bytes32[] memory sigR,
                                bytes32[] memory sigS) public returns (bool) {
 
         // loop through all meta txs
         for (uint256 i = 0; i < senders.length; i++) {
+            if(tokenAddresses[i] != address(this)) {
+                continue; // if the token address specified in meta tx does not match this contract address, skip this meta tx
+            }
+
             if(senders[i] == address(0)) {
                 continue; // don't allow transfers from 0x0, so skip this meta tx and go to the next one
             }
 
-            // check if the nonce is bigger than the previous one
-            if(nonces[i] <= nonceOf(senders[i])) {
-                continue; // if nonce is not bigger than the previous (for the same sender), skip this meta tx
+            // check if the nonce is bigger than the previous one by exactly 1
+            if(nonces[i] != nonceOf(senders[i]) + 1) {
+                continue; // if nonce is not bigger by exactly 1 than the previous nonce (for the same sender), skip this meta tx
             }
 
-            if(_balances[senders[i]] < (amounts[i] + relayer_fees[i])) {
+            if(_balances[senders[i]] < (amounts[i] + relayerFees[i])) {
                 continue; // if sender's balance is less than the amount and the relayer fee, skip this meta tx
-            }
-
-            // check if the hash is correct
-            bytes32 msgHash = keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayer_fees[i], nonces[i]));
-            if(hashes[i] != msgHash) {
-                continue; // if hashes don't match, skip to the next meta tx
             }
 
             // check if the signature is correct (ecrecover returns the meta tx sender's address)
             bytes memory prefix = "\x19Ethereum Signed Message:\n32";
-            if(senders[i] != ecrecover(keccak256(abi.encodePacked(prefix, hashes[i])), sigV[i], sigR[i], sigS[i])) {
+            bytes32 msgHash = keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayerFees[i], nonces[i], tokenAddresses[i]));
+            if(senders[i] != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i], sigR[i], sigS[i])) {
                 continue; // if sig is not valid, skip to the next meta tx
             }
 
@@ -104,7 +103,7 @@ contract ERC20MetaBatch is Context, IERC20 {
             _metaNonces[senders[i]] = nonces[i];
 
             // call the _metaTokenTransfers function
-            _metaTokenTransfers(senders[i], recipients[i], amounts[i], relayer_fees[i]);
+            _metaTokenTransfers(senders[i], recipients[i], amounts[i], relayerFees[i]);
         }
 
         return true;

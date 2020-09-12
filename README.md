@@ -53,8 +53,8 @@ Every time a meta transaction is completed, the smart contract should update the
 - token amount to be transfered - uint256
 - relayer fee (in tokens) - uint256
 - nonce - uint256
-- hash (hash of the values above: sender address, receiver address, token amount, relayer fee, nonce) - bytes32
-- signature (comes in three parts):
+- token contract address - address
+- signature (comes in three parts and it signs a hash of the values above):
   - sigV - uint8
   - sigR - bytes32
   - sigS - bytes32
@@ -65,9 +65,9 @@ When a relayer receives multiple meta txs and decides to make a batch on-chain t
 
 In web development, the data would be sent in a JSON format. But since Solidity does not have a JSON parser (and parsing data on-chain would also be quite expensive), the data could be sent as arrays instead (to avoid parsing a huge string of data).
 
-Currently, it seems that the best approach is the one that is used by [Disperse](https://github.com/banteg/disperse-research/blob/master/contracts/Disperse.sol), which means sending each type of meta data as a **separate array**. One array would consist of sender addresses, the other of receiver addresses, and then 7 more arrays for a token amount, a relayer fee, a nonce, a hash (bytes32 array) and signature arrays.
+Currently, it seems that the best approach is the one that is used by [Disperse](https://github.com/banteg/disperse-research/blob/master/contracts/Disperse.sol), which means sending each type of meta data as a **separate array**. One array would consist of sender addresses, the other of receiver addresses, and then 7 more arrays for a token amount, a relayer fee, a nonce, a token address and signature arrays.
 
-The crucial part here is that the data in arrays must be in the **correct order**. If the ordering is wrong, the smart contract would notice that (because hashes wouldn't match) and abort the change.
+The crucial part here is that the data in arrays must be in the **correct order**. If the ordering is wrong, the smart contract would notice that (because the signature check would fail) and skip that meta transaction.
 
 Example:
 
@@ -75,9 +75,9 @@ Example:
 function transferMetaBatch(address[] memory senders, 
                            address[] memory recipients, 
                            uint256[] memory amounts,
-                           uint256[] memory relayer_fees,
+                           uint256[] memory relayerFees,
                            uint256[] memory nonces,
-                           bytes32[] memory hashes,
+                           address[] memory tokenAddresses,
                            uint8[] memory sigV,
                            bytes32[] memory sigR,
                            bytes32[] memory sigS) public returns (bool) {
@@ -85,7 +85,7 @@ function transferMetaBatch(address[] memory senders,
 }
 ```
 
-An alternative is to use `pragma experimental ABIEncoderV2;` and send data in as an object (as a Struct).
+> An alternative is to use `pragma experimental ABIEncoderV2;` and send data in as an object (as a Struct), but this pragma is not recommended for production.
 
 ### What is the relayer fee?
 
