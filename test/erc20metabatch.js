@@ -47,7 +47,7 @@ contract("ERC20MetaBatch", async accounts => {
         let newNonce = parseInt(lastNonce) + 1;
         //console.log(newNonce);
 
-        // create a hash of both addresses, the token amount, the fee and the nonce
+        // create a hash of both addresses, the token amount, the fee, the nonce and the token contract address
         let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address'], 
                                                           [accountTwo, accountThree, amount, relayerFee, newNonce, instance.address]);
         //console.log("Values encoded: " + valuesEncoded);
@@ -73,7 +73,6 @@ contract("ERC20MetaBatch", async accounts => {
                                                       [amount],
                                                       [relayerFee],
                                                       [newNonce],
-                                                      [instance.address],
                                                       [v],
                                                       [r],
                                                       [s]);
@@ -129,7 +128,6 @@ contract("ERC20MetaBatch", async accounts => {
             amount: amount1,
             relayerFee: relayerFee1,
             nonce: newNonceAccountTwo,
-            tokenAddress: instance.address,
             v: v1,
             r: r1,
             s: s1
@@ -172,7 +170,6 @@ contract("ERC20MetaBatch", async accounts => {
             amount: amount2,
             relayerFee: relayerFee2,
             nonce: newNonceAccountThree,
-            tokenAddress: instance.address,
             v: v2,
             r: r2,
             s: s2
@@ -189,7 +186,6 @@ contract("ERC20MetaBatch", async accounts => {
                                                       [meta_tx_one.amount, meta_tx_two.amount],
                                                       [meta_tx_one.relayerFee, meta_tx_two.relayerFee],
                                                       [meta_tx_one.nonce, meta_tx_two.nonce],
-                                                      [meta_tx_one.tokenAddress, meta_tx_two.tokenAddress],
                                                       [meta_tx_one.v, meta_tx_two.v],
                                                       [meta_tx_one.r, meta_tx_two.r],
                                                       [meta_tx_one.s, meta_tx_two.s]);

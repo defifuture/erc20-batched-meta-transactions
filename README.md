@@ -52,8 +52,8 @@ Every time a meta transaction is completed, the smart contract should update the
 - receiver address
 - token amount to be transfered - uint256
 - relayer fee (in tokens) - uint256
-- nonce - uint256
-- token contract address - address
+- nonce - uint256 (replay protection within the token contract)
+- token contract address (replay protection across different token contracts)
 - signature (comes in three parts and it signs a hash of the values above):
   - sigV - uint8
   - sigR - bytes32
@@ -65,7 +65,7 @@ When a relayer receives multiple meta txs and decides to make a batch on-chain t
 
 In web development, the data would be sent in a JSON format. But since Solidity does not have a JSON parser (and parsing data on-chain would also be quite expensive), the data could be sent as arrays instead (to avoid parsing a huge string of data).
 
-Currently, it seems that the best approach is the one that is used by [Disperse](https://github.com/banteg/disperse-research/blob/master/contracts/Disperse.sol), which means sending each type of meta data as a **separate array**. One array would consist of sender addresses, the other of receiver addresses, and then 7 more arrays for a token amount, a relayer fee, a nonce, a token address and signature arrays.
+Currently, it seems that the best approach is the one that is used by [Disperse](https://github.com/banteg/disperse-research/blob/master/contracts/Disperse.sol), which means sending each type of meta data as a **separate array**. One array would consist of sender addresses, the other of receiver addresses, and then 6 more arrays for a token amount, a relayer fee, a nonce, and three signature arrays.
 
 The crucial part here is that the data in arrays must be in the **correct order**. If the ordering is wrong, the smart contract would notice that (because the signature check would fail) and skip that meta transaction.
 
@@ -77,7 +77,6 @@ function transferMetaBatch(address[] memory senders,
                            uint256[] memory amounts,
                            uint256[] memory relayerFees,
                            uint256[] memory nonces,
-                           address[] memory tokenAddresses,
                            uint8[] memory sigV,
                            bytes32[] memory sigR,
                            bytes32[] memory sigS) public returns (bool) {
@@ -126,6 +125,10 @@ The whole system could easily work without any mempool, too.
 How?
 
 Each relayer would have their own web3 website through which people could send meta transactions. Each person would decide on their own which relayer to use (you could say this system is a kind of a "meta-mempool" and "meta load balancing").
+
+### How can relayer prevent an invalid meta tx to be relayed?
+
+The relayer can check the signature of a meta tx in advance. If the signature is invalid, the meta tx is dropped from the mempool.
 
 ### Can a relayer pass meta transactions to different token contracts in one on-chain tx?
 
