@@ -97,18 +97,6 @@ The sender does not know that because there are probably multiple relayers that 
 
 Instead, the token smart contract will take care of this. The smart contract knows who the relayer is (`msg.sender`) and can then give the relayer the appropriate amount of tokens based on all the relayer fees in all the meta txs (in that on-chain tx).
 
-### Can a relayer pass meta transactions to different token contracts in one on-chain tx?
-
-Not sure about that, probably not. But if we're talking about a token that has a lot of transactions, this shouldn't be a problem. Otherwise the relayer might want to wait longer until the sufficient amount of meta txs (for a certain token) join the mempool.
-
-### Where is the mempool?
-
-The relayers should sync mempools between each other, although because they are competing, this might not happen.
-
-As a solution, there could be nodes that only serve as mempool holders. Not sure how to incentivise them, though (maybe the big dApps maintainers like Synthetix and Aave would want to run them).
-
-Another option could be that the meta tx sender sends the meta tx to many relayers at once.
-
 ### What if there's a meta tx in a relayer's batch that was already sent on-chain by some other relayer?
 
 First of all, the on-chain transaction as a whole should not fail in this case. The already commited meta tx should just be ignored by the smart contract processing the batch. The other (not-yet-commited) meta txs should go through.
@@ -118,6 +106,30 @@ Secondly, some people have pointed out the lost revenue that a relayer has if on
 Instead, the solution to this problem should be done on the relayer network level. One option is to solve this issue in the mempool. The mempool could have threads (or queues) - one for each relayer. Mempool would then act as a load balancer, transfering meta txs equally to each queue. 
 
 This would not prevent a relayer from taking a meta tx from another queue - in fact, if a relayer sees that another relayer is ignoring/censoring a meta tx, they should be encouraged to pick that meta tx up (or a mempool could automatically reassign the meta tx to someone else after some time). But in case a relayer acts maliciously and is "stealing" meta txs from other queues, other relayers could kick that relayer out of the network.
+
+### Where is the mempool?
+
+The relayers should sync mempools between each other, although because they are competing, this might not happen.
+
+As a solution, there could be nodes that only serve as mempool holders. Not sure how to incentivise them, though (maybe the big dApps maintainers like Synthetix and Aave would want to run them).
+
+Another option could be that the meta tx sender sends the meta tx to many relayers at once.
+
+### Can it work without a mempool?
+
+What if there is no mempool?
+
+![](img/there-is-no-mempool.jpg)
+
+The whole system could easily work without any mempool, too.
+
+How?
+
+Each relayer would have their own web3 website through which people could send meta transactions. Each person would decide on their own which relayer to use (you could say this system is a kind of a "meta-mempool" and "meta load balancing").
+
+### Can a relayer pass meta transactions to different token contracts in one on-chain tx?
+
+Only if there's a relayer smart contract in-between.
 
 ### What about approve and allowance?
 
