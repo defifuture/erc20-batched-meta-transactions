@@ -1,77 +1,148 @@
-# A proof-of-concept for batching meta transactions from multiple users
+# An ERC-20 extension for batching meta transactions from multiple users
 
 ## The problem
 
-When you say "meta transactions" people think of **gasless** transactions, which means that someone else (the relayer) makes an on-chain token transaction for you and pays for it in Ether. In return, you can pay the relayer in tokens (instead of Ether).
+By the term "meta transaction" people usually think of a **gasless** transaction, which means that someone else (the relayer) makes an on-chain token transaction for you and pays for it in Ether. In return, you can pay the relayer in tokens (instead of Ether).
 
-The problem with the current implementations of meta transactions is that it allows the relayer to either:
+The problem with current implementations of meta transactions is that they only allow the relayer to either:
 
-A) Relay **only one meta tx at a time**. While this allows the original (meta) tx sender to avoid using ETH, it doesn't lower the transaction cost for her/him, because the relayer has to be compensated in tokens in approx. the same (or higher) value as the gas fees for the on-chain transaction.
+A) Relay **just 1 meta tx in 1 on-chain transaction**. While this allows the meta tx sender to avoid using ETH, it doesn't lower the transaction cost for the sender, because the relayer has to be compensated in tokens in approx. the same (or higher) value as the gas fees for the on-chain transaction.
 
-B) Relay **multiple** meta txs from a **single user** as defined in [EIP-1776](https://github.com/wighawag/singleton-1776-meta-transaction). This helps with reducing the cost per transaction, but it's not a common occurence (that one user would want to send multiple txs at once).
+B) Relay **multiple** meta txs from a **single user** as defined in [EIP-1776](https://github.com/wighawag/singleton-1776-meta-transaction). This helps with reducing the cost per transaction, but it's not a common occurence that a user would want to send multiple txs at once.
 
 ## The solution
 
-The solution is to **batch** meta transactions **from multiple senders** into **one on-chain transaction**.
+The solution is to batch **multiple** meta transactions from **various senders** into **one on-chain transaction**.
 
 This would **lower the cost** of a meta tx for a common user.
 
+![](img/meta-txs-directly-to-token-smart-contract.png)
+
 ## The implementation
 
-The implementation should be pretty straightforward. A user sends a meta transaction to a relayer. Relayer waits for multiple meta txs to come up in a mempool until the meta tx fees (at least) cover the cost of the on-chain gas fee.
+The implementation is pretty straightforward. A user sends a meta transaction to a relayer (through relayer's web app, for example). The relayer waits for multiple meta txs to come up in a mempool until the meta tx fees (at least) cover the cost of the on-chain gas fee.
 
-You can see the basic proof-of-concept in this file: [ERC20MetaBatch.sol](https://github.com/defifuture/batching-meta-transactions/blob/master/contracts/ERC20MetaBatch.sol). This is an extended ERC-20 contract with an added meta tx batch transfer capabilities (see function `processMetaBatch()`).
+Technically, the implementation means **adding a couple of functions** to the existing **ERC-20** token standard:
 
-### What if the relayer forges a meta tx?
+- `processMetaBatch()`
+- `nonceOf()`
 
-Every meta tx should be digitaly signed with a user's Ethereum private key. The token smart contract must then check the validity of a signature (`ecrecover()`).
+You can see the proof-of-concept implementation in this file: [ERC20MetaBatch.sol](https://github.com/defifuture/batching-meta-transactions/blob/master/contracts/ERC20MetaBatch.sol). This is an extended ERC-20 contract with an added meta tx batch transfer capabilities (see function `processMetaBatch()`).
 
-### What if the relayer sends the same meta tx twice (replay attack)?
+### `processMetaBatch()`
 
-The meta tx must include a nonce. Hence the token smart contract must somehow do validation based on the nonce.
-
-Perhaps the easiest would be to keep a **separate mapping for nonces** only:
+The `processMetaBatch()` function is responsible for receiving and processing a batch of meta transactions that change token balances.
 
 ```solidity
-// hashmap of meta tx nonces for each address. New nonce must be always bigger.
+function processMetaBatch(address[] memory senders,
+                          address[] memory recipients,
+                          uint256[] memory amounts,
+                          uint256[] memory relayerFees,
+                          uint256[] memory nonces,
+                          uint256[] memory blocks,
+                          uint8[] memory sigV,
+                          bytes32[] memory sigR,
+                          bytes32[] memory sigS) public returns (bool) {
+
+    // loop through all meta txs
+    for (uint256 i = 0; i < senders.length; i++) {
+
+        // the meta tx should be processed until (including) the specified block number, otherwise it is invalid
+        if(block.number > blocks[i]) {
+            continue; // if current block number is bigger than the requested number, skip this meta tx
+        }
+
+        // check if the new nonce is bigger than the previous one by exactly 1
+        if(nonces[i] != nonceOf(senders[i]) + 1) {
+            continue; // if nonce is not bigger by exactly 1 than the previous nonce (for the same sender), skip this meta tx
+        }
+
+        // check if meta tx sender's balance is big enough
+        if(_balances[senders[i]] < (amounts[i] + relayerFees[i])) {
+            continue; // if sender's balance is less than the amount and the relayer fee, skip this meta tx
+        }
+
+        // check if the signature is valid
+        bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+        bytes32 msgHash = keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayerFees[i], nonces[i], address(this), msg.sender));
+        if(senders[i] != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i], sigR[i], sigS[i])) {
+            continue; // if sig is not valid, skip to the next meta tx
+        }
+
+        // set a new nonce for the sender
+        _metaNonces[senders[i]] = nonces[i];
+
+        // token transfer to recipient
+        _transfer(senders[i], recipients[i], amounts[i]);
+
+        // pay a fee to the relayer (msg.sender)
+        _transfer(senders[i], msg.sender, relayerFees[i]);
+    }
+
+    return true;
+}
+```
+
+As you can see, the `processMetaBatch()` function takes the following parameters:
+
+- an array of sender addresses (meta txs senders, not relayers)
+- an array of receiver addresses
+- an array of amounts
+- an array of relayer fees (relayer is `msg.sender`)
+- an array of nonces
+- an array of block numbers (due "date" for meta tx to be processed)
+- Three arrays that represent parts of a signature (v, r, s)
+
+**Each row** in these arrays represents **data from one meta tx**. That's why the correct order in the arrays is very important.
+
+If a relayer gets the order wrong, the `processMetaBatch()` function would notice that (when validating a signature), because a hash of the meta tx values would not match the signed hash. A meta transaction with an invalid signature is skipped.
+
+### `nonceOf()`
+
+Nonces are needed due to a replay protection (see Replay attacks under Security Considerations).
+
+That's why a mapping between addresses and nonces is required:
+
+```solidity
 mapping (address => uint256) private _metaNonces;
 ```
 
-Another option is to have a 2D array of a token value and a meta tx nonce (mapped to user's address):
+A (meta) nonce of an address can be checked using this function:
 
 ```solidity
-// mapping of address => tokenAmount => metaTxNonce
-mapping(address => mapping(uint256 => uint256)) private __balanceOf;
+function nonceOf(address account) public view returns (uint256) {
+    return _metaNonces[account];
+}
 ```
 
-Every time a meta transaction is completed, the smart contract should update the latest nonce in the mapping. The rule should be that a new meta tx must not have a nonce lower than the previous meta tx (of the same user/address). This way it's easier to check the validity of nonces.
+> The EIP-2612 (`permit()` function) also requires a nonce mapping. At this point I'm not sure yet if this mapping should be re-used in case a smart contract implements both this EIP and EIP-2612. 
+> 
+> On the first glance it seems the nonce mapping could be re-used, but this should be thought through for possible security implications.
 
-### What data is needed in a meta tx?
+### What data is needed in a meta transaction?
 
-- sender address (the user who is sending the meta tx)
+- sender address (a user who is sending the meta tx)
 - receiver address
 - token amount to be transfered - uint256
 - relayer fee (in tokens) - uint256
 - nonce - uint256 (replay protection within the token contract)
-- block number - uint256 (a block number by which the meta tx must be processed)
-- token contract address (replay protection across different token contracts)
-- the relayer address (front-running protection)
+- block number - uint256 (a block by which the meta tx must be processed)
+- **token contract address** (replay protection across different token contracts)
+- **the relayer address** (front-running protection)
 - signature (comes in three parts and it signs a hash of the values above):
   - sigV - uint8
   - sigR - bytes32
   - sigS - bytes32
 
+*(The bolded data is not sent as a parameter, but is still needed to construct a signed hash.)*
+
 ### How is the data (about meta txs) sent to the smart contract?
 
-When a relayer receives multiple meta txs and decides to make a batch on-chain transaction, the data needs to be sent to the smart contract in a way that takes the least amount of gas.
+This proof-of-concept is using the approach used by Disperse [here](https://github.com/banteg/disperse-research/blob/master/contracts/Disperse.sol), which means sending each type of meta tx data as a **separate array parameter**.
 
-In web development, the data would be sent in a JSON format. But since Solidity does not have a JSON parser (and parsing data on-chain would also be quite expensive), the data could be sent as arrays instead (to avoid parsing a huge string of data).
+The crucial part here is that the data in arrays must be in the **correct order**. If the ordering is wrong, the smart contract would notice that (because the signature check would fail) and it would skip that meta transaction.
 
-Currently, it seems that the best approach is the one that is used by [Disperse](https://github.com/banteg/disperse-research/blob/master/contracts/Disperse.sol), which means sending each type of meta data as a **separate array**. One array would consist of sender addresses, the other of receiver addresses, and then 7 more arrays for a token amount, a relayer fee, a nonce, a block number, and three signature arrays.
-
-The crucial part here is that the data in arrays must be in the **correct order**. If the ordering is wrong, the smart contract would notice that (because the signature check would fail) and skip that meta transaction.
-
-Example:
+The `processMetaBatch()` parameters:
 
 ```solidity
 function processMetaBatch(address[] memory senders, 
@@ -87,47 +158,92 @@ function processMetaBatch(address[] memory senders,
 }
 ```
 
-> An alternative is to use `pragma experimental ABIEncoderV2;` and send data in as an object (as a Struct), but this pragma is not recommended for production.
+### The front-end implementation (relayer-side)
 
-### What is the relayer fee?
+This repository does not show how the implementation should look like on a relayer's side.
+
+But in a nutshell, a relayer can have a website (web3 application) through which a user can submit a meta transaction. Pending meta transactions can be logged in that website's database until the relayer decides to make an on-chain transaction.
+
+## Security Considerations
+
+### Forging a meta transaction
+
+The solution against a relayer forging a meta transaction is for user to sign the meta transaction with their own private key.
+
+The `processMetaBatch()` function then verifies the signature using `ecrecover()`.
+
+### Replay attacks
+
+The `processMetaBatch()` function is secure against two types of a replay attack:
+
+1. A nonce prevents a replay attack where a relayer would send the same meta tx more than once.
+2. The current smart contract address (`address(this)`) is included in the meta tx data hash (which is then also signed), which prevents a relayer from sending a meta tx to different token smart contracts (see the code below, under Signature validation). 
+
+### Signature validation
+
+Signing a meta transaction and validating the signature is crucial for this whole scheme to work, because the `msg.sender` is not (necessarily) a meta tx sender.
+
+The `processMetaBatch()` function validates a meta tx signature, and if it's **invalid**, the meta tx is **skipped** (but the whole on-chain transaction is **not reverted**).
+
+```solidity
+bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+
+bytes32 msgHash = keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayerFees[i], nonces[i], address(this), msg.sender));
+
+if(senders[i] != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i], sigR[i], sigS[i])) {
+    continue; // if sig is not valid, skip to the next meta tx in the loop
+}
+```
+
+Why not reverting the whole on-chain transaction? Because there could be only one problematic meta tx and so the others should not be dropped just because of one rotten apple.
+
+That said, it is expected from relayers to validate meta txs in advance before relaying them. That's why relayers are not entitled to a relayer fee for an invalid meta tx.
+
+### Malicious relayer forcing a user into over-spending
+
+A malicious relayer could delay sending user's meta transaction until the user would decide to make the token transaction on-chain.
+
+After that, the relayer would relay the delayed meta tx which would mean that the user would make two token transactions (over-spending).
+
+**Solution:** Each meta transaction should have an expiry date. This is defined by a block number by which the meta transaction must be relayed on-chain.
+
+### Front-running attack
+
+A malicious relayer could scout the Ethereum mempool to steal meta transactions and frontrun the original relayer.
+
+**Solution:** The protection that `processMetaBatch()` function uses is that it requires the meta tx sender to add the relayer's Ethereum address as one of the values in the hash (which is then signed).
+
+When the `processMetaBatch()` function generates a hash it includes the `msg.sender` address in it:
+
+```solidity
+bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+
+bytes32 msgHash = keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayerFees[i], nonces[i], address(this), msg.sender));
+
+if(senders[i] != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i], sigR[i], sigS[i])) {
+    continue; // if sig is not valid, skip to the next meta tx in the loop
+}
+```
+
+If the meta tx was "stolen", the signature check would fail because the `msg.sender` address would not be the same as the intended relayer's address.
+
+### A mailicious (or too impatient) user sending a meta tx with the same nonce through multiple relayers at once
+
+A user that is either malicious or just impatient could submit a meta tx with the same nonce (for the same token contract) to various relayers. Only one of them would get the relayer fee (the first one on-chain), while the others would get an invalid meta transaction.
+
+**Solution:** Relayers could share between each other th information about which meta transactions they have pending (sort of an info mempool).
+
+The relayers don't have to fear that someone would steal their respective pending transactions, due to the front-running protection (see above).
+
+If relayers see meta transactions from a certain sender address that have the same nonce and are supposed to be relayed to the same token smart contract, they can decide that only the first registered meta tx goes through and others are dropped (or in case meta txs were registered at the same time, the remaining meta tx could be randomly picked).
+
+## FAQ
+
+### How much is the relayer fee?
 
 The meta tx sender defines how big fee they want to pay to the relayer.
 
-### How can the sender know which relayer to pay the fee to?
-
-The sender does not know that because there are probably multiple relayers that can pick the meta tx and relay it on-chain.
-
-Instead, the token smart contract will take care of this. The smart contract knows who the relayer is (`msg.sender`) and can then give the relayer the appropriate amount of tokens based on all the relayer fees in all the meta txs (in that on-chain tx).
-
-### What if there's a meta tx in a relayer's batch that was already sent on-chain by some other relayer?
-
-First of all, the on-chain transaction as a whole should not fail in this case. The already commited meta tx should just be ignored by the smart contract processing the batch. The other (not-yet-commited) meta txs should go through.
-
-Secondly, some people have pointed out the lost revenue that a relayer has if one or more meta txs in their batch were already spent. While this is true, I don't think those relayers should be compensated for lost meta tx fees (as some have proposed). The problem is that if they are compensated, the relayers would try to take advantage of this and start to intentially include already spent meta txs in their batches.
-
-Instead, the solution to this problem should be done on the relayer network level. One option is to solve this issue in the mempool. The mempool could have threads (or queues) - one for each relayer. Mempool would then act as a load balancer, transfering meta txs equally to each queue. 
-
-This would not prevent a relayer from taking a meta tx from another queue - in fact, if a relayer sees that another relayer is ignoring/censoring a meta tx, they should be encouraged to pick that meta tx up (or a mempool could automatically reassign the meta tx to someone else after some time). But in case a relayer acts maliciously and is "stealing" meta txs from other queues, other relayers could kick that relayer out of the network.
-
-### Where is the mempool?
-
-The relayers should sync mempools between each other, although because they are competing, this might not happen.
-
-As a solution, there could be nodes that only serve as mempool holders. Not sure how to incentivise them, though (maybe the big dApps maintainers like Synthetix and Aave would want to run them).
-
-Another option could be that the meta tx sender sends the meta tx to many relayers at once.
-
-### Can it work without a mempool?
-
-What if there is no mempool?
-
-![](img/there-is-no-mempool.jpg)
-
-The whole system could easily work without any mempool, too.
-
-How?
-
-Each relayer would have their own web3 website through which people could send meta transactions. Each person would decide on their own which relayer to use (you could say this system is a kind of a "meta-mempool" and "meta load balancing").
+Although more likely the relayer will suggest (maybe even enforce) a certain amount of the relayer fee via the UI (the web3 application).
 
 ### How can relayer prevent an invalid meta tx to be relayed?
 
@@ -138,63 +254,14 @@ The relayer can so some meta tx checks in advance, before sending it on-chain.
 - Check if a sender and a receiver are the same address
 - Check if some meta tx data is missing
 
-### Can a relayer pass meta transactions to different token contracts in one on-chain tx?
-
-Only if there's a relayer smart contract in-between.
-
-### What about approve and allowance?
-
-This proof-of-concept only targets the basic token transfer functionality, so the approve txs are not needed here (might be added later). But it should work in a similar way.
-
 ### Does this approach need a new type of a token contract standard, or is a basic ERC-20 enough?
 
-This approach would need a **extended ERC-20 token standard** (we could call it **ERC20MetaBatch**). This basically means adding a couple of new functions to ERC-20 that would allow relayers to change the token amount for users under the condition the meta tx signatures (made by original senders) are valid. This way meta tx senders don't need to trust relayers.
+This approach would need a **extended ERC-20 token standard** (we could call it **ERC20MetaBatch**). 
 
-Here's an image how the whole system (using ERC20MetaBatch token standard) would work:
-
-![](img/meta-txs-directly-to-token-smart-contract.png)
-
-Note that the image above is a simplified overview that's missing some crucial information like:
-
-- meta txs first go to a mempool from where they are picked by relayers
-- every meta tx is digitally signed by a user (using their Ethereum private key)
-- relayer parses meta txs and sends the data on-chain in a form of multiple data arrays as smart contract function parameters
-- the smart contract checks the validity of each meta tx (checks a signature)
+This means adding a couple of new functions to ERC-20 that would allow relayers to transfer tokens for users under the condition the meta tx signatures (made by original senders) are valid. This way meta tx senders don't need to trust relayers.
 
 ### Is it possible to somehow use the existing ERC-20 token contracts?
 
-This might be possible if all relayers make the on-chain transactions via a special smart contract (which then sends multiple txs to token smart contracts). But this special smart contract would need to have a token spending approval from every user (for each token separately), which would need to be done on-chain.
+This might be possible if all relayers make the on-chain transactions via a special "relayer smart contract" (which then sends multiple txs to token smart contracts). 
 
-In this case, the process would look like this:
-
-![](img/meta-txs-via-relayer-smart-contract-part-1.png)
-
-![](img/meta-txs-via-relayer-smart-contract-part-2.png)
-
-The disadvantage of this process is that a user first needs to do an on-chain transaction, before being able to do off-chain meta transactions. But luckily, the on-chain transaction needs to be made only once per token (if the allowance amount is unlimited, of course).
-
-### What about the `permit()` function?
-
-`permit()` is a very nice function that provides a new functionality to the ERC-20 standard - Basically it means that a user can give a **token-spending approval** to someone else using a **meta transaction** (off-chain). This solves the problem from the **previous question** (a user having to make an on-chain approval transaction first).
-
-> For more information see [EIP-2612: permit – 712-signed approvals](https://eips.ethereum.org/EIPS/eip-2612).
-
-There are two ways of using permits:
-
-- Sending a permit meta tx and a transfer meta tx in **two separate** on-chain txs
-- Sending a permit meta tx and a transfer meta tx in **the same** on-chain tx
-
-More often it would be better to do it in a single on-chain tx (lower tx cost), but there may be cases where two separate on-chain txs make more sense.
-
-#### Two separate transactions
-
-![](img/meta-txs-permit-relayer-two-steps-1.png)
-![](img/meta-txs-permit-relayer-two-steps-2.png)
-
-#### Single transaction
-
-![](img/meta-txs-permit-relayer-single-step.png)
-
-### How to handle the burn address (0x0)
-
-The burn address should be able to **receive** tokens, but it must **not be able to send** tokens (as [suggested here](https://github.com/ethereum/EIPs/issues/1776#issuecomment-467460341)).
+But this relayer smart contract would need to have a token spending approval from every user (for each token separately), which would need to be done on-chain, or via the `permit()` function.
