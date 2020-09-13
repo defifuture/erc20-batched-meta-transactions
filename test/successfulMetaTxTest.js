@@ -62,8 +62,8 @@ contract("Successful Meta Transactions", async accounts => {
         let dueBlockNumber = currentBlockNumber + 3;
 
         // create a hash of both addresses, the token amount, the fee, the nonce and the token contract address
-        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address'], 
-                                                          [accountTwo, accountThree, amount, relayerFee, newNonce, instance.address]);
+        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
+                                                          [accountTwo, accountThree, amount, relayerFee, newNonce, instance.address, accountOne]);
         //console.log("Values encoded: " + valuesEncoded);
         let hash = web3.utils.keccak256(valuesEncoded);
         // console.log("Hash: " + hash);
@@ -100,7 +100,7 @@ contract("Successful Meta Transactions", async accounts => {
     it("should send a meta tx batch - multiple meta txs (all valid)", async() => {
         let instance = await ERC20MetaBatch.deployed();
 
-        letO = accounts[0];  // relayer
+        let accountOne = accounts[0];  // relayer
         let accountTwo = accounts[1];  // meta tx sender
         let accountThree = accounts[2];  // meta tx sender
         let accountFour = accounts[3];  // token receiver
@@ -121,8 +121,8 @@ contract("Successful Meta Transactions", async accounts => {
         let dueBlockNumber = currentBlockNumber + 3;
 
         // create a hash of both addresses, the token amount, the fee and the nonce
-        let valuesEncoded1 = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address'], 
-                                                           [accountTwo, accountFour, amount1, relayerFee1, newNonceAccountTwo, instance.address]);
+        let valuesEncoded1 = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
+                                                           [accountTwo, accountFour, amount1, relayerFee1, newNonceAccountTwo, instance.address, accountOne]);
         //console.log("Values encoded: " + valuesEncoded1);
         let hash1 = web3.utils.keccak256(valuesEncoded1);
         // console.log("Hash: " + hash1);
@@ -159,8 +159,8 @@ contract("Successful Meta Transactions", async accounts => {
         //console.log(newNonceAccountThree);
 
         // create a hash of both addresses, the token amount, the fee and the nonce
-        let valuesEncoded2 = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address'], 
-                                                           [accountThree, accountFive, amount2, relayerFee2, newNonceAccountThree, instance.address]);
+        let valuesEncoded2 = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
+                                                           [accountThree, accountFive, amount2, relayerFee2, newNonceAccountThree, instance.address, accountOne]);
         //console.log("Values encoded: " + valuesEncoded2);
         let hash2 = web3.utils.keccak256(valuesEncoded2);
         // console.log("Hash: " + hash2);
@@ -238,8 +238,8 @@ contract("Successful Meta Transactions - Edge Cases", async accounts => {
         let currentBlockNumber = await web3.eth.getBlockNumber();
         let dueBlockNumber = currentBlockNumber + 3;
 
-        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address'], 
-                                                          [accountOne, accountOne, amount, relayerFee, newNonce, instance.address]);
+        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
+                                                          [accountOne, accountOne, amount, relayerFee, newNonce, instance.address, accountOne]);
 
         let hash = web3.utils.keccak256(valuesEncoded);
 

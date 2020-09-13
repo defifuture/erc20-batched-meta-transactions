@@ -55,6 +55,7 @@ Every time a meta transaction is completed, the smart contract should update the
 - nonce - uint256 (replay protection within the token contract)
 - block number - uint256 (a block number by which the meta tx must be processed)
 - token contract address (replay protection across different token contracts)
+- the relayer address (front-running protection)
 - signature (comes in three parts and it signs a hash of the values above):
   - sigV - uint8
   - sigR - bytes32

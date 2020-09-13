@@ -93,7 +93,7 @@ contract ERC20MetaBatch is Context, IERC20 {
 
             // check if the signature is valid
             bytes memory prefix = "\x19Ethereum Signed Message:\n32";
-            bytes32 msgHash = keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayerFees[i], nonces[i], address(this)));
+            bytes32 msgHash = keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayerFees[i], nonces[i], address(this), msg.sender));
             if(senders[i] != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i], sigR[i], sigS[i])) {
                 continue; // if sig is not valid, skip to the next meta tx
             }
