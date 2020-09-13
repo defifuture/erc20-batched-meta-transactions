@@ -14,7 +14,7 @@ B) Relay **multiple** meta txs from a **single user** as defined in [EIP-1776](h
 
 The solution is to batch **multiple** meta transactions from **various senders** into **one on-chain transaction**.
 
-This would **lower the cost** of a meta tx for a common user.
+This would **lower the cost** of a transaction for a common user.
 
 ![](img/meta-txs-directly-to-token-smart-contract.png)
 
@@ -265,3 +265,7 @@ This means adding a couple of new functions to ERC-20 that would allow relayers 
 This might be possible if all relayers make the on-chain transactions via a special "relayer smart contract" (which then sends multiple txs to token smart contracts). 
 
 But this relayer smart contract would need to have a token spending approval from every user (for each token separately), which would need to be done on-chain, or via the `permit()` function.
+
+## Feedback
+
+I'm looking forward to your feedback! 🙂 Please share it using GitHub issues or [this Ethereum Magicians topic](https://ethereum-magicians.org/t/batched-meta-transactions-from-multiple-users-is-this-ready-for-an-eip-draft/4613).
