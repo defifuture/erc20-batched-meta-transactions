@@ -1,15 +1,25 @@
 const ERC20MetaBatch = artifacts.require("ERC20MetaBatch");
 
-contract("ERC20MetaBatch", async accounts => {
+function sliceSignature(signature) {
+    let r = signature.slice(0, 66);
+    let s = "0x" + signature.slice(66, 130);
+    let v = "0x" + signature.slice(130, 132);
+    v = web3.utils.toDecimal(v);
+    v = v + 27;
 
-    it("should return a token name", async () => {
+    return {r, s, v};
+}
+
+contract("Successful Meta Transactions", async accounts => {
+
+    it("should return a token name (not a meta tx)", async () => {
         let instance = await ERC20MetaBatch.deployed();
         let name = await instance.name();
         //console.log("Contract name: " + name);
         assert.equal(name, "Meta Tx Token");
     });
 
-    it("should check how much tokens the contract deployer has", async() => {
+    it("should check how much tokens the contract deployer has (not a meta tx)", async() => {
         let instance = await ERC20MetaBatch.deployed();
         let contractDeployer = accounts[0];
 
@@ -17,7 +27,7 @@ contract("ERC20MetaBatch", async accounts => {
         assert.equal(deployerBalance, 10*1000*1000);
     });
 
-    it("should send tokens from one address to another", async() => {
+    it("should send tokens from one address to another (not a meta tx)", async() => {
         let instance = await ERC20MetaBatch.deployed();
         let sender = accounts[0];
         let receiver = accounts[1];
@@ -56,26 +66,21 @@ contract("ERC20MetaBatch", async accounts => {
 
         // create a signature
         let signature = await web3.eth.sign(hash, accountTwo);
-
-        let r = signature.slice(0, 66);
-        let s = "0x" + signature.slice(66, 130);
-        let v = "0x" + signature.slice(130, 132);
-        v = web3.utils.toDecimal(v);
-        v = v + 27;
+        let sigSlices = sliceSignature(signature);
 
         // Make sure the second account still has 50 tokens (from the previous test)
         let balanceTwo = await instance.balanceOf(accountTwo);
         assert.equal(parseInt(balanceTwo), 50);
 
         // send meta batch tx
-        let result = await instance.transferMetaBatch([accountTwo],
-                                                      [accountThree],
-                                                      [amount],
-                                                      [relayerFee],
-                                                      [newNonce],
-                                                      [v],
-                                                      [r],
-                                                      [s]);
+        let result = await instance.processMetaBatch([accountTwo],
+                                                     [accountThree],
+                                                     [amount],
+                                                     [relayerFee],
+                                                     [newNonce],
+                                                     [sigSlices.v],
+                                                     [sigSlices.r],
+                                                     [sigSlices.s]);
         // console.log(result);
 
         // Second account should now have 39 tokens (50 - 10 - 1)
@@ -115,12 +120,7 @@ contract("ERC20MetaBatch", async accounts => {
 
         // create a signature
         let signature = await web3.eth.sign(hash1, accountTwo);
-
-        let r1 = signature.slice(0, 66);
-        let s1 = "0x" + signature.slice(66, 130);
-        let v1 = "0x" + signature.slice(130, 132);
-        v1 = web3.utils.toDecimal(v1);
-        v1 = v1 + 27;
+        let sigSlices = sliceSignature(signature);
 
         let meta_tx_one = {
             sender: accountTwo,
@@ -128,9 +128,9 @@ contract("ERC20MetaBatch", async accounts => {
             amount: amount1,
             relayerFee: relayerFee1,
             nonce: newNonceAccountTwo,
-            v: v1,
-            r: r1,
-            s: s1
+            v: sigSlices.v,
+            r: sigSlices.r,
+            s: sigSlices.s
         }
 
         // Make sure the second account still has 39 tokens (from the previous test)
@@ -157,12 +157,7 @@ contract("ERC20MetaBatch", async accounts => {
 
         // create a signature
         let signature2 = await web3.eth.sign(hash2, accountThree);
-
-        let r2 = signature2.slice(0, 66);
-        let s2 = "0x" + signature2.slice(66, 130);
-        let v2 = "0x" + signature2.slice(130, 132);
-        v2 = web3.utils.toDecimal(v2);
-        v2 += 27;
+        let sigSlices2 = sliceSignature(signature2);
 
         let meta_tx_two = {
             sender: accountThree,
@@ -170,9 +165,9 @@ contract("ERC20MetaBatch", async accounts => {
             amount: amount2,
             relayerFee: relayerFee2,
             nonce: newNonceAccountThree,
-            v: v2,
-            r: r2,
-            s: s2
+            v: sigSlices2.v,
+            r: sigSlices2.r,
+            s: sigSlices2.s
         }
 
         // Make sure the third account still has 10 tokens (from the previous test)
@@ -181,14 +176,14 @@ contract("ERC20MetaBatch", async accounts => {
         // END META TX 2
 
         // SEND META TXS BATCH
-        let result = await instance.transferMetaBatch([meta_tx_one.sender, meta_tx_two.sender],
-                                                      [meta_tx_one.receiver, meta_tx_two.receiver],
-                                                      [meta_tx_one.amount, meta_tx_two.amount],
-                                                      [meta_tx_one.relayerFee, meta_tx_two.relayerFee],
-                                                      [meta_tx_one.nonce, meta_tx_two.nonce],
-                                                      [meta_tx_one.v, meta_tx_two.v],
-                                                      [meta_tx_one.r, meta_tx_two.r],
-                                                      [meta_tx_one.s, meta_tx_two.s]);
+        let result = await instance.processMetaBatch([meta_tx_one.sender, meta_tx_two.sender],
+                                                     [meta_tx_one.receiver, meta_tx_two.receiver],
+                                                     [meta_tx_one.amount, meta_tx_two.amount],
+                                                     [meta_tx_one.relayerFee, meta_tx_two.relayerFee],
+                                                     [meta_tx_one.nonce, meta_tx_two.nonce],
+                                                     [meta_tx_one.v, meta_tx_two.v],
+                                                     [meta_tx_one.r, meta_tx_two.r],
+                                                     [meta_tx_one.s, meta_tx_two.s]);
         // console.log(result);
 
         // Second account should now have 30 tokens (39 - 9)
@@ -208,4 +203,48 @@ contract("ERC20MetaBatch", async accounts => {
         assert.equal(parseInt(balanceFive), 3);
     });
 
+});
+
+contract("Successful Meta Transactions - Edge Cases", async accounts => {
+    
+    it("should show correct balance if relayer is also sender and receiver at the same time", async() => {
+        let instance = await ERC20MetaBatch.deployed();
+
+        let accountOne = accounts[0];  // relayer, sender, and receiver
+
+        let balanceOne = await instance.balanceOf(accountOne);
+        assert.equal(parseInt(balanceOne), 10000000);
+
+        let amount = 10;
+        let relayerFee = 1;
+
+        let lastNonce = await instance.nonceOf(accountOne);
+        assert.equal(parseInt(lastNonce), 0);
+        let newNonce = parseInt(lastNonce) + 1
+
+        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address'], 
+                                                          [accountOne, accountOne, amount, relayerFee, newNonce, instance.address]);
+
+        let hash = web3.utils.keccak256(valuesEncoded);
+
+        // create a signature
+        let signature = await web3.eth.sign(hash, accountOne);
+        let sigSlices = sliceSignature(signature);
+
+        // send meta batch tx
+        let result = await instance.processMetaBatch([accountOne],
+                                                     [accountOne],
+                                                     [amount],
+                                                     [relayerFee],
+                                                     [newNonce],
+                                                     [sigSlices.v],
+                                                     [sigSlices.r],
+                                                     [sigSlices.s]);
+
+        balanceOne = await instance.balanceOf(accountOne);
+        assert.equal(parseInt(balanceOne), 10000000);
+
+        let currentNonce = await instance.nonceOf(accountOne);
+        assert.equal(parseInt(currentNonce), 1);
+    });
 });

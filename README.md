@@ -20,7 +20,7 @@ This would **lower the cost** of a meta tx for a common user.
 
 The implementation should be pretty straightforward. A user sends a meta transaction to a relayer. Relayer waits for multiple meta txs to come up in a mempool until the meta tx fees (at least) cover the cost of the on-chain gas fee.
 
-You can see the basic proof-of-concept in this file: [ERC20MetaBatch.sol](https://github.com/defifuture/batching-meta-transactions/blob/master/contracts/ERC20MetaBatch.sol). This is an extended ERC-20 contract with an added meta tx batch transfer capabilities (see function `transferMetaBatch()`).
+You can see the basic proof-of-concept in this file: [ERC20MetaBatch.sol](https://github.com/defifuture/batching-meta-transactions/blob/master/contracts/ERC20MetaBatch.sol). This is an extended ERC-20 contract with an added meta tx batch transfer capabilities (see function `processMetaBatch()`).
 
 ### What if the relayer forges a meta tx?
 
@@ -72,14 +72,14 @@ The crucial part here is that the data in arrays must be in the **correct order*
 Example:
 
 ```solidity
-function transferMetaBatch(address[] memory senders, 
-                           address[] memory recipients, 
-                           uint256[] memory amounts,
-                           uint256[] memory relayerFees,
-                           uint256[] memory nonces,
-                           uint8[] memory sigV,
-                           bytes32[] memory sigR,
-                           bytes32[] memory sigS) public returns (bool) {
+function processMetaBatch(address[] memory senders, 
+                          address[] memory recipients, 
+                          uint256[] memory amounts,
+                          uint256[] memory relayerFees,
+                          uint256[] memory nonces,
+                          uint8[] memory sigV,
+                          bytes32[] memory sigR,
+                          bytes32[] memory sigS) public returns (bool) {
     //... function code ...
 }
 ```
@@ -128,7 +128,12 @@ Each relayer would have their own web3 website through which people could send m
 
 ### How can relayer prevent an invalid meta tx to be relayed?
 
-The relayer can check the signature of a meta tx in advance. If the signature is invalid, the meta tx is dropped from the mempool.
+The relayer can so some meta tx checks in advance, before sending it on-chain.
+
+- Check if a signature is valid
+- Check if a sender or a receiver is a null address (0x0)
+- Check if a sender and a receiver are the same address
+- Check if some meta tx data is missing
 
 ### Can a relayer pass meta transactions to different token contracts in one on-chain tx?
 

@@ -63,21 +63,17 @@ contract ERC20MetaBatch is Context, IERC20 {
     /**
      * @dev Process meta txs batch
      */
-    function transferMetaBatch(address[] memory senders,
-                               address[] memory recipients,
-                               uint256[] memory amounts,
-                               uint256[] memory relayerFees,
-                               uint256[] memory nonces,
-                               uint8[] memory sigV,
-                               bytes32[] memory sigR,
-                               bytes32[] memory sigS) public returns (bool) {
+    function processMetaBatch(address[] memory senders,
+                              address[] memory recipients,
+                              uint256[] memory amounts,
+                              uint256[] memory relayerFees,
+                              uint256[] memory nonces,
+                              uint8[] memory sigV,
+                              bytes32[] memory sigR,
+                              bytes32[] memory sigS) public returns (bool) {
 
         // loop through all meta txs
         for (uint256 i = 0; i < senders.length; i++) {
-            if(senders[i] == address(0)) {
-                continue; // don't allow transfers from 0x0, so skip this meta tx and go to the next one
-            }
-
             // check if the nonce is bigger than the previous one by exactly 1
             if(nonces[i] != nonceOf(senders[i]) + 1) {
                 continue; // if nonce is not bigger by exactly 1 than the previous nonce (for the same sender), skip this meta tx
@@ -97,25 +93,14 @@ contract ERC20MetaBatch is Context, IERC20 {
             // set a new nonce for the sender
             _metaNonces[senders[i]] = nonces[i];
 
-            // call the _metaTokenTransfers function
-            _metaTokenTransfers(senders[i], recipients[i], amounts[i], relayerFees[i]);
+            // token transfer to recipient
+            _transfer(senders[i], recipients[i], amounts[i]);
+
+            // pay a fee to the relayer (msg.sender)
+            _transfer(senders[i], msg.sender, relayerFees[i]);
         }
 
         return true;
-    }
-
-    // token transfers are separated from the transferMetaBatch function in order to reduce the stack (and avoid the "Stack Too Deep" error)
-    function _metaTokenTransfers(address sender, address recipient, uint256 amount, uint256 relayer_fee) internal {
-        uint256 totalAmount = amount.add(relayer_fee);
-
-        // subtract the token amount AND the relayer fee from the senders account
-        _balances[sender] = _balances[sender].sub(totalAmount, "ERC20MetaBatch: transfer amount exceeds balance.");
-
-        // add tokens to the recipient's account
-        _balances[recipient] = _balances[recipient].add(amount);
-
-        // pay relayer fee to the relayer's account
-        _balances[msg.sender] = _balances[msg.sender].add(relayer_fee);
     }
 
 
