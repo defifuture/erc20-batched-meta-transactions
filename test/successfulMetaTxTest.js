@@ -57,6 +57,10 @@ contract("Successful Meta Transactions", async accounts => {
         let newNonce = parseInt(lastNonce) + 1;
         //console.log(newNonce);
 
+        // get a current block number
+        let currentBlockNumber = await web3.eth.getBlockNumber();
+        let dueBlockNumber = currentBlockNumber + 3;
+
         // create a hash of both addresses, the token amount, the fee, the nonce and the token contract address
         let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address'], 
                                                           [accountTwo, accountThree, amount, relayerFee, newNonce, instance.address]);
@@ -78,6 +82,7 @@ contract("Successful Meta Transactions", async accounts => {
                                                      [amount],
                                                      [relayerFee],
                                                      [newNonce],
+                                                     [dueBlockNumber],
                                                      [sigSlices.v],
                                                      [sigSlices.r],
                                                      [sigSlices.s]);
@@ -111,6 +116,10 @@ contract("Successful Meta Transactions", async accounts => {
         let newNonceAccountTwo = parseInt(lastNonceAccountTwo) + 1;
         //console.log(newNonceAccountTwo);
 
+        // get a current block number
+        let currentBlockNumber = await web3.eth.getBlockNumber();
+        let dueBlockNumber = currentBlockNumber + 3;
+
         // create a hash of both addresses, the token amount, the fee and the nonce
         let valuesEncoded1 = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address'], 
                                                            [accountTwo, accountFour, amount1, relayerFee1, newNonceAccountTwo, instance.address]);
@@ -128,6 +137,7 @@ contract("Successful Meta Transactions", async accounts => {
             amount: amount1,
             relayerFee: relayerFee1,
             nonce: newNonceAccountTwo,
+            dueBlock: dueBlockNumber,
             v: sigSlices.v,
             r: sigSlices.r,
             s: sigSlices.s
@@ -165,6 +175,7 @@ contract("Successful Meta Transactions", async accounts => {
             amount: amount2,
             relayerFee: relayerFee2,
             nonce: newNonceAccountThree,
+            dueBlock: dueBlockNumber,
             v: sigSlices2.v,
             r: sigSlices2.r,
             s: sigSlices2.s
@@ -181,6 +192,7 @@ contract("Successful Meta Transactions", async accounts => {
                                                      [meta_tx_one.amount, meta_tx_two.amount],
                                                      [meta_tx_one.relayerFee, meta_tx_two.relayerFee],
                                                      [meta_tx_one.nonce, meta_tx_two.nonce],
+                                                     [meta_tx_one.dueBlock, meta_tx_two.dueBlock],
                                                      [meta_tx_one.v, meta_tx_two.v],
                                                      [meta_tx_one.r, meta_tx_two.r],
                                                      [meta_tx_one.s, meta_tx_two.s]);
@@ -222,6 +234,10 @@ contract("Successful Meta Transactions - Edge Cases", async accounts => {
         assert.equal(parseInt(lastNonce), 0);
         let newNonce = parseInt(lastNonce) + 1
 
+        // get a current block number
+        let currentBlockNumber = await web3.eth.getBlockNumber();
+        let dueBlockNumber = currentBlockNumber + 3;
+
         let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address'], 
                                                           [accountOne, accountOne, amount, relayerFee, newNonce, instance.address]);
 
@@ -237,6 +253,7 @@ contract("Successful Meta Transactions - Edge Cases", async accounts => {
                                                      [amount],
                                                      [relayerFee],
                                                      [newNonce],
+                                                     [dueBlockNumber],
                                                      [sigSlices.v],
                                                      [sigSlices.r],
                                                      [sigSlices.s]);

@@ -31,6 +31,9 @@ contract("Skipped Meta Transactions", async accounts => {
         let lastNonce = await instance.nonceOf(accountOne);
         let newNonce = parseInt(lastNonce) + 1
 
+        let currentBlockNumber = await web3.eth.getBlockNumber();
+        let dueBlockNumber = currentBlockNumber + 3;
+
         let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address'], 
                                                           [accountTwo, accountThree, amount, relayerFee, newNonce, instance.address]);
 
@@ -46,6 +49,7 @@ contract("Skipped Meta Transactions", async accounts => {
                                                      [amount],
                                                      [relayerFee],
                                                      [newNonce],
+                                                     [dueBlockNumber],
                                                      [sigSlices.v],
                                                      [sigSlices.r],
                                                      [sigSlices.s]);
@@ -74,6 +78,9 @@ contract("Skipped Meta Transactions", async accounts => {
 
         let newNonce = parseInt(lastNonce) + 1;
         //console.log(newNonce);
+
+        let currentBlockNumber = await web3.eth.getBlockNumber();
+        let dueBlockNumber = currentBlockNumber + 3;
 
         // create a hash of both addresses, the token amount, the fee, the nonce and the token contract address
         let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address'], 
@@ -104,6 +111,7 @@ contract("Skipped Meta Transactions", async accounts => {
                                                      [amount],
                                                      [relayerFee],
                                                      [newNonce],
+                                                     [dueBlockNumber],
                                                      [sigSlices.v],
                                                      [sigSlices.r],
                                                      [sigSlices.s]);

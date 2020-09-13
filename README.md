@@ -34,7 +34,7 @@ Perhaps the easiest would be to keep a **separate mapping for nonces** only:
 
 ```solidity
 // hashmap of meta tx nonces for each address. New nonce must be always bigger.
-mapping(address => uint256) private __nonceOf;
+mapping (address => uint256) private _metaNonces;
 ```
 
 Another option is to have a 2D array of a token value and a meta tx nonce (mapped to user's address):
@@ -53,6 +53,7 @@ Every time a meta transaction is completed, the smart contract should update the
 - token amount to be transfered - uint256
 - relayer fee (in tokens) - uint256
 - nonce - uint256 (replay protection within the token contract)
+- block number - uint256 (a block number by which the meta tx must be processed)
 - token contract address (replay protection across different token contracts)
 - signature (comes in three parts and it signs a hash of the values above):
   - sigV - uint8
@@ -65,7 +66,7 @@ When a relayer receives multiple meta txs and decides to make a batch on-chain t
 
 In web development, the data would be sent in a JSON format. But since Solidity does not have a JSON parser (and parsing data on-chain would also be quite expensive), the data could be sent as arrays instead (to avoid parsing a huge string of data).
 
-Currently, it seems that the best approach is the one that is used by [Disperse](https://github.com/banteg/disperse-research/blob/master/contracts/Disperse.sol), which means sending each type of meta data as a **separate array**. One array would consist of sender addresses, the other of receiver addresses, and then 6 more arrays for a token amount, a relayer fee, a nonce, and three signature arrays.
+Currently, it seems that the best approach is the one that is used by [Disperse](https://github.com/banteg/disperse-research/blob/master/contracts/Disperse.sol), which means sending each type of meta data as a **separate array**. One array would consist of sender addresses, the other of receiver addresses, and then 7 more arrays for a token amount, a relayer fee, a nonce, a block number, and three signature arrays.
 
 The crucial part here is that the data in arrays must be in the **correct order**. If the ordering is wrong, the smart contract would notice that (because the signature check would fail) and skip that meta transaction.
 
@@ -77,6 +78,7 @@ function processMetaBatch(address[] memory senders,
                           uint256[] memory amounts,
                           uint256[] memory relayerFees,
                           uint256[] memory nonces,
+                          uint256[] memory blocks,
                           uint8[] memory sigV,
                           bytes32[] memory sigR,
                           bytes32[] memory sigS) public returns (bool) {

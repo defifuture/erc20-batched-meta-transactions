@@ -68,22 +68,30 @@ contract ERC20MetaBatch is Context, IERC20 {
                               uint256[] memory amounts,
                               uint256[] memory relayerFees,
                               uint256[] memory nonces,
+                              uint256[] memory blocks,
                               uint8[] memory sigV,
                               bytes32[] memory sigR,
                               bytes32[] memory sigS) public returns (bool) {
 
         // loop through all meta txs
         for (uint256 i = 0; i < senders.length; i++) {
-            // check if the nonce is bigger than the previous one by exactly 1
+
+            // the meta tx should be processed until (including) the specified block number, otherwise it is invalid
+            if(block.number > blocks[i]) {
+                continue; // if current block number is bigger than the requested number, skip this meta tx
+            }
+
+            // check if the new nonce is bigger than the previous one by exactly 1
             if(nonces[i] != nonceOf(senders[i]) + 1) {
                 continue; // if nonce is not bigger by exactly 1 than the previous nonce (for the same sender), skip this meta tx
             }
 
+            // check if meta tx sender's balance is big enough
             if(_balances[senders[i]] < (amounts[i] + relayerFees[i])) {
                 continue; // if sender's balance is less than the amount and the relayer fee, skip this meta tx
             }
 
-            // check if the signature is correct (ecrecover returns the meta tx sender's address)
+            // check if the signature is valid
             bytes memory prefix = "\x19Ethereum Signed Message:\n32";
             bytes32 msgHash = keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayerFees[i], nonces[i], address(this)));
             if(senders[i] != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i], sigR[i], sigS[i])) {
