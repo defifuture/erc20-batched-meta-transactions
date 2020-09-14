@@ -1,4 +1,4 @@
-# An ERC-20 extension for batching meta transactions from multiple users
+# An ERC-20 extension for batched meta transactions from multiple users
 
 ## The problem
 
@@ -27,7 +27,7 @@ Technically, the implementation means **adding a couple of functions** to the ex
 - `processMetaBatch()`
 - `nonceOf()`
 
-You can see the proof-of-concept implementation in this file: [ERC20MetaBatch.sol](/blob/master/contracts/ERC20MetaBatch.sol). This is an extended ERC-20 contract with an added meta tx batch transfer capabilities (see function `processMetaBatch()`).
+You can see the proof-of-concept implementation in this file: [ERC20MetaBatch.sol](/contracts/ERC20MetaBatch.sol). This is an extended ERC-20 contract with an added meta tx batch transfer capabilities (see function `processMetaBatch()`).
 
 ### `processMetaBatch()`
 
