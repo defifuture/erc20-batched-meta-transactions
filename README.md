@@ -27,7 +27,7 @@ Technically, the implementation means **adding a couple of functions** to the ex
 - `processMetaBatch()`
 - `nonceOf()`
 
-You can see the proof-of-concept implementation in this file: [ERC20MetaBatch.sol](https://github.com/defifuture/batching-meta-transactions/blob/master/contracts/ERC20MetaBatch.sol). This is an extended ERC-20 contract with an added meta tx batch transfer capabilities (see function `processMetaBatch()`).
+You can see the proof-of-concept implementation in this file: [ERC20MetaBatch.sol](/blob/master/contracts/ERC20MetaBatch.sol). This is an extended ERC-20 contract with an added meta tx batch transfer capabilities (see function `processMetaBatch()`).
 
 ### `processMetaBatch()`
 
