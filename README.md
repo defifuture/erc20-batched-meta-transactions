@@ -247,7 +247,7 @@ Although more likely the relayer will suggest (maybe even enforce) a certain amo
 
 ### How can relayer prevent an invalid meta tx to be relayed?
 
-The relayer can so some meta tx checks in advance, before sending it on-chain.
+The relayer can do some meta tx checks in advance, before sending it on-chain.
 
 - Check if a signature is valid
 - Check if a sender or a receiver is a null address (0x0)
