@@ -167,9 +167,13 @@ function processMetaBatch(address[] memory senders,
 
 ### The front-end implementation (relayer-side)
 
-This repository does not show how the implementation should look like on a relayer's side.
+The `processMetaBatch()` function is agnostic to how relayers work and are organised.
 
-But in a nutshell, a relayer can have a website (web3 application) through which a user can submit a meta transaction. Pending meta transactions can be logged in that website's database until the relayer decides to make an on-chain transaction.
+The function can be used by a network of relayers who coordinate to avoid collisions (meta txs with the same nonce meant for the same token contract). Having a network of relayers makes sense for tokens with lots of traffic.
+
+A relayer would most likely have a website (web3 application) through which a user could submit a meta transaction. Pending meta transactions can be logged in that website's database (and communicated with other relayers to avoid collisions) until the relayer decides to make an on-chain transaction.
+
+Less used dApps might have only one relayer due to low traffic - although if traffic is too low, using `processMetaBatch()` would not make sense because there would be too few transactions to even make a batch (no tx cost savings).
 
 ## Security Considerations
 
@@ -273,6 +277,8 @@ This might be possible if all relayers make the on-chain transactions via a spec
 
 But this relayer smart contract would need to have a token spending approval from every user (for each token separately), which would need to be done on-chain, or via the `permit()` function.
 
+More info here: https://github.com/defifuture/relayer-smart-contract 
+
 ## Feedback
 
-I'm looking forward to your feedback! 🙂 Please share it using GitHub issues or [this Ethereum Magicians topic](https://ethereum-magicians.org/t/batched-meta-transactions-from-multiple-users-is-this-ready-for-an-eip-draft/4613).
+I'm looking forward to your feedback! 🙂 Please share it using GitHub issues or [this Ethereum Magicians topic](https://ethereum-magicians.org/t/batched-meta-transactions-from-multiple-users-is-this-ready-for-an-eip-draft/4613). Thanks!
