@@ -18,6 +18,13 @@ This would **lower the cost** of a transaction for a common user.
 
 ![](img/meta-txs-directly-to-token-smart-contract.png)
 
+### Use cases
+
+There are many potential use cases, but the two most important are:
+
+- cheap transfer of tokens from one address to another
+- a low-cost bridge between mainnet and L2 solutions like sidechains and rollups (which require an on-chain deposit before you can use them)
+
 ## The implementation
 
 The implementation is pretty straightforward. A user sends a meta transaction to a relayer (through relayer's web app, for example). The relayer waits for multiple meta txs to come up in a mempool until the meta tx fees (at least) cover the cost of the on-chain gas fee.
