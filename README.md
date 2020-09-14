@@ -100,7 +100,7 @@ As you can see, the `processMetaBatch()` function takes the following parameters
 - an array of block numbers (due "date" for meta tx to be processed)
 - Three arrays that represent parts of a signature (v, r, s)
 
-**Each row** in these arrays represents **data from one meta tx**. That's why the correct order in the arrays is very important.
+**Each item** in these arrays represents **data from one meta tx**. That's why the correct order in the arrays is very important.
 
 If a relayer gets the order wrong, the `processMetaBatch()` function would notice that (when validating a signature), because a hash of the meta tx values would not match the signed hash. A meta transaction with an invalid signature is skipped.
 
@@ -177,9 +177,11 @@ Less used dApps might have only one relayer due to low traffic - although if tra
 
 ## Security Considerations
 
+Here is a list of potential security issues and how are they addressed in this EIP.
+
 ### Forging a meta transaction
 
-The solution against a relayer forging a meta transaction is for user to sign the meta transaction with their own private key.
+The solution against a relayer forging a meta transaction is for a user to sign the meta transaction with their own private key.
 
 The `processMetaBatch()` function then verifies the signature using `ecrecover()`.
 
@@ -188,11 +190,11 @@ The `processMetaBatch()` function then verifies the signature using `ecrecover()
 The `processMetaBatch()` function is secure against two types of a replay attack:
 
 1. A nonce prevents a replay attack where a relayer would send the same meta tx more than once.
-2. The current smart contract address (`address(this)`) is included in the meta tx data hash (which is then also signed), which prevents a relayer from sending a meta tx to different token smart contracts (see the code below, under Signature validation). 
+2. The current smart contract address (`address(this)`) is included in the meta tx data hash, which prevents a relayer from sending a meta tx to different token smart contracts (see the code below, under Signature validation). 
 
 ### Signature validation
 
-Signing a meta transaction and validating the signature is crucial for this whole scheme to work, because the `msg.sender` is not (necessarily) a meta tx sender.
+Signing a meta transaction and validating the signature is crucial for this whole scheme to work.
 
 The `processMetaBatch()` function validates a meta tx signature, and if it's **invalid**, the meta tx is **skipped** (but the whole on-chain transaction is **not reverted**).
 
@@ -206,21 +208,36 @@ if(senders[i] != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i]
 }
 ```
 
-Why not reverting the whole on-chain transaction? Because there could be only one problematic meta tx and so the others should not be dropped just because of one rotten apple.
+Why not reverting the whole on-chain transaction? Because there could be only one problematic meta tx, and the others should not be dropped just because of one rotten apple.
 
-That said, it is expected from relayers to validate meta txs in advance before relaying them. That's why relayers are not entitled to a relayer fee for an invalid meta tx.
+That said, it is expected of relayers to validate meta txs in advance before relaying them. That's why relayers are not entitled to a relayer fee for an invalid meta tx.
 
 ### Malicious relayer forcing a user into over-spending
 
-A malicious relayer could delay sending user's meta transaction until the user would decide to make the token transaction on-chain.
+A malicious relayer could delay sending some user's meta transaction until the user would decide to make the token transaction on-chain.
 
-After that, the relayer would relay the delayed meta tx which would mean that the user would make two token transactions (over-spending).
+After that, the relayer would relay the delayed meta tx which would mean that the user would have made two token transactions (over-spending).
 
-**Solution:** Each meta transaction should have an expiry date. This is defined by a block number by which the meta transaction must be relayed on-chain.
+**Solution:** Each meta transaction should have an "expiry date". This is defined in a form of a block number by which the meta transaction must be relayed on-chain.
+
+```solidity
+function processMetaBatch(...
+                          uint256[] memory blocks,
+                          ...) public returns (bool) {
+    
+	// loop through all meta txs
+    for (uint256 i = 0; i < senders.length; i++) {
+
+        // the meta tx should be processed until (including) the specified block number, otherwise it is invalid
+        if(block.number > blocks[i]) {
+            continue; // if current block number is bigger than the requested number, skip this meta tx
+        }
+        ...
+```
 
 ### Front-running attack
 
-A malicious relayer could scout the Ethereum mempool to steal meta transactions and frontrun the original relayer.
+A malicious relayer could scout the Ethereum mempool to steal meta transactions and front-run the original relayer.
 
 **Solution:** The protection that `processMetaBatch()` function uses is that it requires the meta tx sender to add the relayer's Ethereum address as one of the values in the hash (which is then signed).
 
@@ -238,15 +255,21 @@ if(senders[i] != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i]
 
 If the meta tx was "stolen", the signature check would fail because the `msg.sender` address would not be the same as the intended relayer's address.
 
-### A mailicious (or too impatient) user sending a meta tx with the same nonce through multiple relayers at once
+### A malicious (or too impatient) user sending a meta tx with the same nonce through multiple relayers at once
 
 A user that is either malicious or just impatient could submit a meta tx with the same nonce (for the same token contract) to various relayers. Only one of them would get the relayer fee (the first one on-chain), while the others would get an invalid meta transaction.
 
-**Solution:** Relayers could share between each other th information about which meta transactions they have pending (sort of an info mempool).
+**Solution:** Relayers could **share a list of their pending meta txs** between each other (sort of an info mempool).
 
 The relayers don't have to fear that someone would steal their respective pending transactions, due to the front-running protection (see above).
 
 If relayers see meta transactions from a certain sender address that have the same nonce and are supposed to be relayed to the same token smart contract, they can decide that only the first registered meta tx goes through and others are dropped (or in case meta txs were registered at the same time, the remaining meta tx could be randomly picked).
+
+At a minimum, relayers need to share this meta tx data (in order to detect meta tx collision):
+
+- sender address
+- token address
+- nonce
 
 ## FAQ
 
