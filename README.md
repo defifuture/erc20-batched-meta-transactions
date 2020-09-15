@@ -271,6 +271,25 @@ At a minimum, relayers need to share this meta tx data (in order to detect meta 
 - token address
 - nonce
 
+### Too big due block number
+
+The relayer could trick the meta tx sender into adding too big due block number - this means a block by which the meta tx must be processed. The block number could be significantly into the future, for example 10 years into the future. This means that relayer would have 10 years to submit the meta transaction.
+
+**One way** to solve this problem is by adding an upper bound constraint for a block number within the smart contract. For example, we could say that the specified due block number must not be biger than 100'000 blocks from the current one (this is around 17 days in the future if we assume 15 seconds block time).
+
+```solidity
+// the meta tx should be processed until (including) the specified block number, otherwise it is invalid
+if(block.number > blocks[i] || blocks[i] > (block.number + 100000)) {
+    // If current block number is bigger than the requested due block number, skip this meta tx.
+    // Also skip if the due block number is too big (bigger than 100'000 blocks in the future).
+    continue;
+}
+```
+
+This addition could open new security implications, so it should be left out of the formal specification of this EIP. But anyone who wishes to implement this EIP should know about this potential constraint, too.
+
+**The other way** is to keep the `processMetaBatch()` function as it is and rather check for the too big due block number **on the relayer level**. In this case, the user could be notified about the problem and could issue a new meta tx with another relayer that would have a much lower due block number (and the same nonce).
+
 ## FAQ
 
 ### How much is the relayer fee?

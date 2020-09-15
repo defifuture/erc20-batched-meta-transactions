@@ -34,8 +34,8 @@ contract("Skipped Meta Transactions", async accounts => {
         let currentBlockNumber = await web3.eth.getBlockNumber();
         let dueBlockNumber = currentBlockNumber + 3;
 
-        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
-                                                          [accountTwo, accountThree, amount, relayerFee, newNonce, instance.address, accountOne]);
+        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
+                                                          [accountTwo, accountThree, amount, relayerFee, newNonce, dueBlockNumber, instance.address, accountOne]);
 
         let hash = web3.utils.keccak256(valuesEncoded);
 
@@ -84,8 +84,8 @@ contract("Skipped Meta Transactions", async accounts => {
         let dueBlockNumber = currentBlockNumber + 3;
 
         // create a hash of both addresses, the token amount, the fee, the nonce and the token contract address
-        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
-                                                          [accountTwo, accountThree, amount, relayerFee, newNonce, instance.address, accountOne]);
+        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
+                                                          [accountTwo, accountThree, amount, relayerFee, newNonce, dueBlockNumber, instance.address, accountOne]);
         
         let hash = web3.utils.keccak256(valuesEncoded);
 
@@ -139,6 +139,71 @@ contract("Skipped Meta Transactions", async accounts => {
         assert.equal(parseInt(balanceFour), 0);
     });
 
+    it("should skip if receiver address is 0x0", async() => {
+        let instance = await ERC20MetaBatch.deployed();
+
+        let accountOne = accounts[0];  // relayer
+        let accountTwo = accounts[1];  // meta tx sender
+        let accountThree = "0x0000000000000000000000000000000000000000";  // meta tx receiver
+        
+        // meta tx data
+        let amount = 10;
+        let relayerFee = 1;
+
+        let lastNonce = await instance.nonceOf(accountOne);
+        let newNonce = parseInt(lastNonce) + 1;
+
+        let currentBlockNumber = await web3.eth.getBlockNumber();
+        let dueBlockNumber = currentBlockNumber + 3;
+
+        // create a hash of both addresses, the token amount, the fee, the nonce and the token contract address
+        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
+                                                          [accountTwo, accountThree, amount, relayerFee, newNonce, dueBlockNumber, instance.address, accountOne]);
+        
+        let hash = web3.utils.keccak256(valuesEncoded);
+
+        // create a signature
+        let signature = await web3.eth.sign(hash, accountTwo);
+        let sigSlices = sliceSignature(signature);
+
+        // Account 1 (relayer) should have 9999950 tokens (10 million - 50 tokens sent to account 2 before the start)
+        let balanceOne = await instance.balanceOf(accountOne);
+        assert.equal(parseInt(balanceOne), 9999950);
+
+        // Account 2 (sender) should have 50 tokens
+        let balanceTwo = await instance.balanceOf(accountTwo);
+        assert.equal(parseInt(balanceTwo), 50);
+
+        // Account 3 (receiver) should have 0 tokens
+        let balanceThree = await instance.balanceOf(accountThree);
+        assert.equal(parseInt(balanceThree), 0);
+
+        // send meta batch tx
+        let result = await instance.processMetaBatch([accountTwo],
+                                                     [accountThree],
+                                                     [amount],
+                                                     [relayerFee],
+                                                     [newNonce],
+                                                     [dueBlockNumber],
+                                                     [sigSlices.v],
+                                                     [sigSlices.r],
+                                                     [sigSlices.s]);
+
+        // RESULT: The meta tx should have been skipped, so the balances should've stayed the same
+
+        // Account 1 (relayer) - The relayer gets nothing because it should've validated the meta tx sig before sending it on-chain
+        balanceOne = await instance.balanceOf(accountOne);
+        assert.equal(parseInt(balanceOne), 9999950);
+
+        // Account 2 (sender)
+        balanceTwo = await instance.balanceOf(accountTwo);
+        assert.equal(parseInt(balanceTwo), 50);
+
+        // Account 3 (receiver)
+        balanceThree = await instance.balanceOf(accountThree);
+        assert.equal(parseInt(balanceThree), 0);
+    });
+
     it("should skip if meta tx was processed too late (due block number too low)", async() => {
         let instance = await ERC20MetaBatch.deployed();
 
@@ -156,8 +221,8 @@ contract("Skipped Meta Transactions", async accounts => {
         let dueBlockNumber = currentBlockNumber - 1;  // block number TOO LOW (in the past - this should skip the meta tx)
 
         // create a hash
-        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
-                                                          [accountTwo, accountThree, amount, relayerFee, newNonce, instance.address, accountOne]);
+        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
+                                                          [accountTwo, accountThree, amount, relayerFee, newNonce, dueBlockNumber, instance.address, accountOne]);
         
         let hash = web3.utils.keccak256(valuesEncoded);
 
@@ -222,8 +287,8 @@ contract("Skipped Meta Transactions", async accounts => {
         let dueBlockNumber = currentBlockNumber + 3;
 
         // create a hash of both addresses, the token amount, the fee, the nonce and the token contract address
-        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
-                                                          [accountTwo, accountThree, amount, relayerFee, newNonce, instance.address, accountFour]); // Note that the intended relayer's address is added here (accountFour)
+        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
+                                                          [accountTwo, accountThree, amount, relayerFee, newNonce, dueBlockNumber, instance.address, accountFour]); // Note that the intended relayer's address is added here (accountFour)
         
         let hash = web3.utils.keccak256(valuesEncoded);
 

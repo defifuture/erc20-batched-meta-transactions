@@ -36,6 +36,7 @@ contract("Successful Meta Transactions", async accounts => {
         //console.log("Token amount: " + amount);
 
         let result = await instance.transfer(receiver, amount);
+        // console.log("Gas used for on-chain token transfer: " + result.receipt.gasUsed);
 
         let balanceReceiver = await instance.balanceOf(receiver);
         assert.equal(balanceReceiver, 50)
@@ -62,8 +63,8 @@ contract("Successful Meta Transactions", async accounts => {
         let dueBlockNumber = currentBlockNumber + 3;
 
         // create a hash of both addresses, the token amount, the fee, the nonce and the token contract address
-        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
-                                                          [accountTwo, accountThree, amount, relayerFee, newNonce, instance.address, accountOne]);
+        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
+                                                          [accountTwo, accountThree, amount, relayerFee, newNonce, dueBlockNumber, instance.address, accountOne]);
         //console.log("Values encoded: " + valuesEncoded);
         let hash = web3.utils.keccak256(valuesEncoded);
         // console.log("Hash: " + hash);
@@ -87,6 +88,7 @@ contract("Successful Meta Transactions", async accounts => {
                                                      [sigSlices.r],
                                                      [sigSlices.s]);
         // console.log(result);
+        // console.log("Gas used for meta batch (single tx): " + result.receipt.gasUsed);
 
         // Second account should now have 39 tokens (50 - 10 - 1)
         balanceTwo = await instance.balanceOf(accountTwo);
@@ -97,7 +99,7 @@ contract("Successful Meta Transactions", async accounts => {
         assert.equal(parseInt(balanceThree), 10);
     });
 
-    it("should send a meta tx batch - multiple meta txs (all valid)", async() => {
+    it("should send a meta tx batch - two meta txs (both valid)", async() => {
         let instance = await ERC20MetaBatch.deployed();
 
         let accountOne = accounts[0];  // relayer
@@ -121,8 +123,8 @@ contract("Successful Meta Transactions", async accounts => {
         let dueBlockNumber = currentBlockNumber + 3;
 
         // create a hash of both addresses, the token amount, the fee and the nonce
-        let valuesEncoded1 = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
-                                                           [accountTwo, accountFour, amount1, relayerFee1, newNonceAccountTwo, instance.address, accountOne]);
+        let valuesEncoded1 = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
+                                                           [accountTwo, accountFour, amount1, relayerFee1, newNonceAccountTwo, dueBlockNumber, instance.address, accountOne]);
         //console.log("Values encoded: " + valuesEncoded1);
         let hash1 = web3.utils.keccak256(valuesEncoded1);
         // console.log("Hash: " + hash1);
@@ -159,8 +161,8 @@ contract("Successful Meta Transactions", async accounts => {
         //console.log(newNonceAccountThree);
 
         // create a hash of both addresses, the token amount, the fee and the nonce
-        let valuesEncoded2 = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
-                                                           [accountThree, accountFive, amount2, relayerFee2, newNonceAccountThree, instance.address, accountOne]);
+        let valuesEncoded2 = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
+                                                           [accountThree, accountFive, amount2, relayerFee2, newNonceAccountThree, dueBlockNumber, instance.address, accountOne]);
         //console.log("Values encoded: " + valuesEncoded2);
         let hash2 = web3.utils.keccak256(valuesEncoded2);
         // console.log("Hash: " + hash2);
@@ -197,6 +199,7 @@ contract("Successful Meta Transactions", async accounts => {
                                                      [meta_tx_one.r, meta_tx_two.r],
                                                      [meta_tx_one.s, meta_tx_two.s]);
         // console.log(result);
+        // console.log("Gas used for meta batch (two txs): " + result.receipt.gasUsed);
 
         // Second account should now have 30 tokens (39 - 9)
         balanceTwo = await instance.balanceOf(accountTwo);
@@ -215,53 +218,4 @@ contract("Successful Meta Transactions", async accounts => {
         assert.equal(parseInt(balanceFive), 3);
     });
 
-});
-
-contract("Successful Meta Transactions - Edge Cases", async accounts => {
-    
-    it("should show correct balance if relayer is also sender and receiver at the same time", async() => {
-        let instance = await ERC20MetaBatch.deployed();
-
-        let accountOne = accounts[0];  // relayer, sender, and receiver
-
-        let balanceOne = await instance.balanceOf(accountOne);
-        assert.equal(parseInt(balanceOne), 10000000);
-
-        let amount = 10;
-        let relayerFee = 1;
-
-        let lastNonce = await instance.nonceOf(accountOne);
-        assert.equal(parseInt(lastNonce), 0);
-        let newNonce = parseInt(lastNonce) + 1
-
-        // get a current block number
-        let currentBlockNumber = await web3.eth.getBlockNumber();
-        let dueBlockNumber = currentBlockNumber + 3;
-
-        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
-                                                          [accountOne, accountOne, amount, relayerFee, newNonce, instance.address, accountOne]);
-
-        let hash = web3.utils.keccak256(valuesEncoded);
-
-        // create a signature
-        let signature = await web3.eth.sign(hash, accountOne);
-        let sigSlices = sliceSignature(signature);
-
-        // send meta batch tx
-        let result = await instance.processMetaBatch([accountOne],
-                                                     [accountOne],
-                                                     [amount],
-                                                     [relayerFee],
-                                                     [newNonce],
-                                                     [dueBlockNumber],
-                                                     [sigSlices.v],
-                                                     [sigSlices.r],
-                                                     [sigSlices.s]);
-
-        balanceOne = await instance.balanceOf(accountOne);
-        assert.equal(parseInt(balanceOne), 10000000);
-
-        let currentNonce = await instance.nonceOf(accountOne);
-        assert.equal(parseInt(currentNonce), 1);
-    });
 });

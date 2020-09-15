@@ -40,4 +40,40 @@ describe("Non contract tests", function() {
             assert.equal(amount, balanceReceiverAfter-balanceReceiverBefore);
         });
     });
+
+    /*
+    // run this if you need a JSON file of public/private keys
+    describe("Generate keys", async function() {
+        let testRounds = 0;
+        let keys = [];
+
+        for(let i = 0; i < testRounds; i++) {
+            // create a random sender address
+            sender = await web3.eth.accounts.create(web3.utils.randomHex(32));
+
+            keys.push({"address": sender.address, "privateKey": sender.privateKey});
+        }
+
+        // console.log(keys);
+
+        
+        let jsonString = JSON.stringify(keys);
+
+        let fs = require('fs');
+
+        fs.writeFile("test/keys.json", jsonString, function(err, result) {
+            if(err) console.log('error', err);
+        });
+        
+
+        console.log("load json");
+
+        let jsonFile = require('./keys.json');
+        console.log(jsonFile[0]);
+        console.log(jsonFile[0].address);
+
+        //let readJson = JSON.parse(jsonString);
+        //console.log(readJson[0].address);
+    });
+    */
 });

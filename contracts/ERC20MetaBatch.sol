@@ -72,9 +72,23 @@ contract ERC20MetaBatch is Context, IERC20 {
                               uint8[] memory sigV,
                               bytes32[] memory sigR,
                               bytes32[] memory sigS) public returns (bool) {
+        
+        address sender;
+        address recipient;
+        uint256 amount;
+        bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+        bytes32 msgHash;
+        uint256 i;
 
         // loop through all meta txs
-        for (uint256 i = 0; i < senders.length; i++) {
+        for (i = 0; i < senders.length; i++) {
+            sender = senders[i];
+            recipient = recipients[i];
+            amount = amounts[i];
+
+            if(sender == address(0) || recipient == address(0)) {
+                continue; // sender or recipient is 0x0 address, skip this meta tx
+            }
 
             // the meta tx should be processed until (including) the specified block number, otherwise it is invalid
             if(block.number > blocks[i]) {
@@ -82,30 +96,28 @@ contract ERC20MetaBatch is Context, IERC20 {
             }
 
             // check if the new nonce is bigger than the previous one by exactly 1
-            if(nonces[i] != nonceOf(senders[i]) + 1) {
+            if(nonces[i] != nonceOf(sender) + 1) {
                 continue; // if nonce is not bigger by exactly 1 than the previous nonce (for the same sender), skip this meta tx
             }
 
             // check if meta tx sender's balance is big enough
-            if(_balances[senders[i]] < (amounts[i] + relayerFees[i])) {
+            if(_balances[sender] < (amount + relayerFees[i])) {
                 continue; // if sender's balance is less than the amount and the relayer fee, skip this meta tx
             }
 
             // check if the signature is valid
-            bytes memory prefix = "\x19Ethereum Signed Message:\n32";
-            bytes32 msgHash = keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayerFees[i], nonces[i], address(this), msg.sender));
-            if(senders[i] != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i], sigR[i], sigS[i])) {
+            msgHash = keccak256(abi.encode(sender, recipient, amount, relayerFees[i], nonces[i], blocks[i], address(this), msg.sender));
+            if(sender != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i], sigR[i], sigS[i])) {
                 continue; // if sig is not valid, skip to the next meta tx
             }
 
             // set a new nonce for the sender
-            _metaNonces[senders[i]] = nonces[i];
+            _metaNonces[sender] = nonces[i];
 
-            // token transfer to recipient
-            _transfer(senders[i], recipients[i], amounts[i]);
-
-            // pay a fee to the relayer (msg.sender)
-            _transfer(senders[i], msg.sender, relayerFees[i]);
+            // transfer tokens
+            _balances[sender] -= (amount + relayerFees[i]);
+            _balances[recipient] += amount;
+            _balances[msg.sender] += relayerFees[i];
         }
 
         return true;
