@@ -23,6 +23,9 @@ contract("Test #1: reference point - a normal on-chain token transfer tx", async
         
         let amount = 10;
 
+        let name = await instance.name();
+        console.log("Token name: " + name);
+
         let result = await instance.transfer(receiver, amount);
         console.log("Gas used for #1: " + result.receipt.gasUsed + "/tx");
 

@@ -344,10 +344,10 @@ More info here: https://github.com/defifuture/relayer-smart-contract
 In order to test the gas efficiency of the `processMetaBatch()` function, I decided to do the following tests:
 
 - **Test #1 (reference point):** This is a normal on-chain token transfer transaction, which serves as a reference point (a score to beat). Gas used per meta transaction must be better than this reference point.
-- **Test #2:** A `processMetaBatch()` transaction where relayer, sender and receiver in all meta transactions is the same address (1 sender/relayer/receiver for N meta transactions).
-- **Test #3:** A `processMetaBatch()` transaction where relayer and sender are one address, and receiver is another one - in all meta transactions (1 sender/relayer, 1 receiver for N meta transactions).
-- **Test #4:** A `processMetaBatch()` transaction where relayer and sender are one address, but receiver is a different address in every meta transaction (1 sender/relayer, N receivers for N meta transactions).
-- **Test #5:** A `processMetaBatch()` transaction where relayer is one address, but senders and receivers are a different address (even from each other) in every meta transaction (1 relayer, N senders, N receivers for N meta transactions). This test is **the most important** one for the hypothesis.
+- **Test #2:** A `processMetaBatch()` transaction where relayer, sender and receiver in all meta transactions is the same address (1 sender/relayer/receiver for M meta transactions).
+- **Test #3:** A `processMetaBatch()` transaction where relayer and sender are one address, and receiver is another one - in all meta transactions (1 sender/relayer, 1 receiver for M meta transactions).
+- **Test #4:** A `processMetaBatch()` transaction where relayer and sender are one address, but receiver is a different address in every meta transaction (1 sender/relayer, M receivers for M meta transactions).
+- **Test #5:** A `processMetaBatch()` transaction where relayer is one address, but senders and receivers are a different address (even from each other) in every meta transaction (1 relayer, M senders, M receivers for M meta transactions). This test is **the most important** one for the hypothesis.
 
 All the tests were run with different batch sizes:
 
@@ -363,7 +363,7 @@ All the tests were run with different batch sizes:
 
 - Gas cost is always around **51000/tx** (score to beat).
 
-**Test #2 (1 sender/relayer/receiver for N meta transactions):**
+**Test #2 (1 sender/relayer/receiver for M meta transactions):**
 
 - 1 meta tx in the batch: 61981/meta tx (total gas: 61981)
 - 5 meta txs in the batch: 25173.2/meta tx (total gas: 125866)
@@ -371,7 +371,7 @@ All the tests were run with different batch sizes:
 - 50 meta txs in the batch: 16930.2/meta tx (total gas: 846510)
 - 100 meta txs in the batch: 16519.72/meta tx (total gas: 1651972)
 
-**Test #3 (1 sender/relayer, 1 receiver for N meta transactions):**
+**Test #3 (1 sender/relayer, 1 receiver for M meta transactions):**
 
 - 1 meta tx in the batch: 85393/meta tx (total gas: 85393)
 - 5 meta txs in the batch: 29848.4/meta tx (total gas: 149242)
@@ -379,7 +379,7 @@ All the tests were run with different batch sizes:
 - 50 meta txs in the batch: 17399.16/meta tx (total gas: 869958)
 - 100 meta txs in the batch: 16753.24/meta tx (total gas: 1675324)
 
-**Test #4 (1 sender/relayer, N receivers for N meta transactions):**
+**Test #4 (1 sender/relayer, M receivers for M meta transactions):**
 
 - 1 meta tx in the batch: 85393/meta tx (total gas: 85393)
 - 5 meta txs in the batch: 45215.6/meta tx (total gas: 226078)
@@ -387,7 +387,7 @@ All the tests were run with different batch sizes:
 - 50 meta txs in the batch: 36215.16/meta tx (total gas: 1810758)
 - 100 meta txs in the batch: 35759.56/meta tx (total gas: 3575956)
 
-**Test #5 (1 relayer, N senders, N receivers for N meta transactions):**
+**Test #5 (1 relayer, M senders, M receivers for M meta transactions):**
 
 - 1 meta tx in the batch: 89581/meta tx (total gas: 89581)
 - 5 meta txs in the batch: 64775.6/meta tx (total gas: 323878)
@@ -496,7 +496,52 @@ Results (for Test #5 - all validation removed, no meta nonce change, only token 
 
 While nonce is an important security feature, it seems that removing it shows **significant** gas reductions.
 
-In this case, it might be good to try to change the way nonces are stored. Instead of its own array, nonces could be joined with token balances in a 2D array.
+In this case, it might be good to try to change the way nonces are stored. Instead of its own mapping, nonces mapping could be joined with token balances into one mapping.
+
+### Joining the `_balances` mapping and the `_metaNonces` mapping
+
+The original implementation has both the mappings separate:
+
+```solidity
+mapping (address => uint256) private _balances;
+
+mapping (address => uint256) private _metaNonces;
+```
+
+To see if gas improvements could be made, I have joined both mappings into one:
+
+```solidity
+mapping (address => uint256[2]) private _balancesNonces;
+```
+
+Accessing balance and nonce for an address then looked like this:
+
+```solidity
+uint256 balance = _balancesNonces[account][0];
+
+uint256 nonce = _balancesNonces[account][1];
+```
+
+Changing balance/nonce values was pretty straightforward:
+
+```solidity
+_balancesNonces[account][0] += amount; // add amount to balance
+
+_balancesNonces[account][1] += 1; // raise nonce by one
+```
+
+**How has the gas usage improve?**
+
+By absolutely nothing. No impact whatsoever.
+
+## Conclusion
+
+Batched meta transactions (at least in this implementation) **do not reduce gas cost for M-to-M transactions** (many senders - many receivers). Note that this means that all senders and all receivers are unique addresses (no duplicates) and that receivers have not hold any tokens before.
+
+Where we have seen gas reductions were the 1-to-1 (1 sender - 1 receiver) and 1-to-M (1 sender, many receivers - probably the same vice-versa) examples. So batched meta transactions may still make sense for some use cases, for example the following:
+
+- 1 sender wanting to send tokens to many receivers (for example a project sending weekly token rewards, like Balancer)
+- Many senders sending tokens to 1 receiver (a deposit to a lock contract in order to access L2 - if a bridge to L2 is configured this way)
 
 ## Feedback
 
