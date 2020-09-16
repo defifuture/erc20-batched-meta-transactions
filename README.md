@@ -14,7 +14,7 @@ B) Relay **multiple** meta txs from a **single user** as defined in [EIP-1776](h
 
 The solution is to batch **multiple** meta transactions from **various senders** into **one on-chain transaction**.
 
-This would **lower the cost** of a transaction for a common user.
+**Hypothesis:** This would **lower the cost** of a transaction for a common user. (Note: see test results at the end.)
 
 ![](img/meta-txs-directly-to-token-smart-contract.png)
 
@@ -41,8 +41,8 @@ You can see the proof-of-concept implementation in this file: [ERC20MetaBatch.so
 The `processMetaBatch()` function is responsible for receiving and processing a batch of meta transactions that change token balances.
 
 ```solidity
-function processMetaBatch(address[] memory senders,
-                          address[] memory recipients,
+function processMetaBatch(address[] memory senders, 
+                          address[] memory recipients, 
                           uint256[] memory amounts,
                           uint256[] memory relayerFees,
                           uint256[] memory nonces,
@@ -51,8 +51,23 @@ function processMetaBatch(address[] memory senders,
                           bytes32[] memory sigR,
                           bytes32[] memory sigS) public returns (bool) {
 
+    // declare some variables before the loop for better gas efficiency
+    address sender;
+    address recipient;
+    uint256 amount;
+    bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+    bytes32 msgHash;
+    uint256 i;
+
     // loop through all meta txs
-    for (uint256 i = 0; i < senders.length; i++) {
+    for (i = 0; i < senders.length; i++) {
+        sender = senders[i];
+        recipient = recipients[i];
+        amount = amounts[i];
+
+        if(sender == address(0) || recipient == address(0)) {
+            continue; // sender or recipient is 0x0 address, skip this meta tx
+        }
 
         // the meta tx should be processed until (including) the specified block number, otherwise it is invalid
         if(block.number > blocks[i]) {
@@ -60,30 +75,28 @@ function processMetaBatch(address[] memory senders,
         }
 
         // check if the new nonce is bigger than the previous one by exactly 1
-        if(nonces[i] != nonceOf(senders[i]) + 1) {
+        if(nonces[i] != nonceOf(sender) + 1) {
             continue; // if nonce is not bigger by exactly 1 than the previous nonce (for the same sender), skip this meta tx
         }
 
         // check if meta tx sender's balance is big enough
-        if(_balances[senders[i]] < (amounts[i] + relayerFees[i])) {
+        if(_balances[sender] < (amount + relayerFees[i])) {
             continue; // if sender's balance is less than the amount and the relayer fee, skip this meta tx
         }
 
         // check if the signature is valid
-        bytes memory prefix = "\x19Ethereum Signed Message:\n32";
-        bytes32 msgHash = keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayerFees[i], nonces[i], address(this), msg.sender));
-        if(senders[i] != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i], sigR[i], sigS[i])) {
+        msgHash = keccak256(abi.encode(sender, recipient, amount, relayerFees[i], nonces[i], blocks[i], address(this), msg.sender));
+        if(sender != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i], sigR[i], sigS[i])) {
             continue; // if sig is not valid, skip to the next meta tx
         }
 
         // set a new nonce for the sender
-        _metaNonces[senders[i]] = nonces[i];
+        _metaNonces[sender] = nonces[i];
 
-        // token transfer to recipient
-        _transfer(senders[i], recipients[i], amounts[i]);
-
-        // pay a fee to the relayer (msg.sender)
-        _transfer(senders[i], msg.sender, relayerFees[i]);
+        // transfer tokens
+        _balances[sender] -= (amount + relayerFees[i]);
+        _balances[recipient] += amount;
+        _balances[msg.sender] += relayerFees[i];
     }
 
     return true;
@@ -201,6 +214,8 @@ The `processMetaBatch()` function validates a meta tx signature, and if it's **i
 ```solidity
 bytes memory prefix = "\x19Ethereum Signed Message:\n32";
 
+//...
+
 bytes32 msgHash = keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayerFees[i], nonces[i], address(this), msg.sender));
 
 if(senders[i] != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i], sigR[i], sigS[i])) {
@@ -225,14 +240,17 @@ function processMetaBatch(...
                           uint256[] memory blocks,
                           ...) public returns (bool) {
     
+    //...
+
 	// loop through all meta txs
-    for (uint256 i = 0; i < senders.length; i++) {
+    for (i = 0; i < senders.length; i++) {
 
         // the meta tx should be processed until (including) the specified block number, otherwise it is invalid
         if(block.number > blocks[i]) {
             continue; // if current block number is bigger than the requested number, skip this meta tx
         }
-        ...
+
+        //...
 ```
 
 ### Front-running attack
@@ -320,6 +338,165 @@ This might be possible if all relayers make the on-chain transactions via a spec
 But this relayer smart contract would need to have a token spending approval from every user (for each token separately), which would need to be done on-chain, or via the `permit()` function.
 
 More info here: https://github.com/defifuture/relayer-smart-contract 
+
+## Gas used tests
+
+In order to test the gas efficiency of the `processMetaBatch()` function, I decided to do the following tests:
+
+- **Test #1 (reference point):** This is a normal on-chain token transfer transaction, which serves as a reference point (a score to beat). Gas used per meta transaction must be better than this reference point.
+- **Test #2:** A `processMetaBatch()` transaction where relayer, sender and receiver in all meta transactions is the same address (1 sender/relayer/receiver for N meta transactions).
+- **Test #3:** A `processMetaBatch()` transaction where relayer and sender are one address, and receiver is another one - in all meta transactions (1 sender/relayer, 1 receiver for N meta transactions).
+- **Test #4:** A `processMetaBatch()` transaction where relayer and sender are one address, but receiver is a different address in every meta transaction (1 sender/relayer, N receivers for N meta transactions).
+- **Test #5:** A `processMetaBatch()` transaction where relayer is one address, but senders and receivers are a different address (even from each other) in every meta transaction (1 relayer, N senders, N receivers for N meta transactions). This test is **the most important** one for the hypothesis.
+
+All the tests were run with different batch sizes:
+
+- 1 meta tx in the batch
+- 5 meta txs in the batch
+- 10 meta txs in the batch
+- 50 meta txs in the batch
+- 100 meta txs in the batch
+
+### Results
+
+**Test #1 (reference point):**
+
+- Gas cost is always around **51000/tx** (score to beat).
+
+**Test #2 (1 sender/relayer/receiver for N meta transactions):**
+
+- 1 meta tx in the batch: 61981/meta tx (total gas: 61981)
+- 5 meta txs in the batch: 25173.2/meta tx (total gas: 125866)
+- 10 meta txs in the batch: 20574/meta tx (total gas: 205740)
+- 50 meta txs in the batch: 16930.2/meta tx (total gas: 846510)
+- 100 meta txs in the batch: 16519.72/meta tx (total gas: 1651972)
+
+**Test #3 (1 sender/relayer, 1 receiver for N meta transactions):**
+
+- 1 meta tx in the batch: 85393/meta tx (total gas: 85393)
+- 5 meta txs in the batch: 29848.4/meta tx (total gas: 149242)
+- 10 meta txs in the batch: 22917.6/meta tx (total gas: 229176)
+- 50 meta txs in the batch: 17399.16/meta tx (total gas: 869958)
+- 100 meta txs in the batch: 16753.24/meta tx (total gas: 1675324)
+
+**Test #4 (1 sender/relayer, N receivers for N meta transactions):**
+
+- 1 meta tx in the batch: 85393/meta tx (total gas: 85393)
+- 5 meta txs in the batch: 45215.6/meta tx (total gas: 226078)
+- 10 meta txs in the batch: 40195.2/meta tx (total gas: 401952)
+- 50 meta txs in the batch: 36215.16/meta tx (total gas: 1810758)
+- 100 meta txs in the batch: 35759.56/meta tx (total gas: 3575956)
+
+**Test #5 (1 relayer, N senders, N receivers for N meta transactions):**
+
+- 1 meta tx in the batch: 89581/meta tx (total gas: 89581)
+- 5 meta txs in the batch: 64775.6/meta tx (total gas: 323878)
+- 10 meta txs in the batch: 61671.6/meta tx (total gas: 616716)
+- 50 meta txs in the batch: 59227.08/meta tx (total gas: 2961354)
+- 100 meta txs in the batch: 58966.48/meta tx (total gas: 5896648)
+
+As you can see, Test #5 (the most important test for this hypothesis) never comes below the reference point. Which means that using normal on-chain token transfers is more gas efficient than using `processMetaBatch()` function in the form in which is coded in this proposal. 
+
+That said, there might be a more efficient way to code it. See additional test runs below for a potential bottleneck.
+
+### Additional test runs for Test #5 to find a bottleneck
+
+Additional test runs (only for Test #5) were performed where the `processMetaBatch()` function was stripped of all validation and did only token transfers (note that the parameters were kept the same, except the `blocks` parameter was removed). 
+
+In the first test run the nonce change is present, while in the second test run it is not. The difference is quite significant.
+
+**1) Only token transfers and meta nonce change**
+
+```solidity
+    function processMetaBatch(address[] memory senders,
+                              address[] memory recipients,
+                              uint256[] memory amounts,
+                              uint256[] memory relayerFees,
+                              uint256[] memory nonces,
+                              uint8[] memory sigV,
+                              bytes32[] memory sigR,
+                              bytes32[] memory sigS) public returns (bool) {
+        
+        address sender;
+        address recipient;
+        uint256 amount;
+        uint256 i;
+
+        // loop through all meta txs
+        for (i = 0; i < senders.length; i++) {
+            sender = senders[i];
+            recipient = recipients[i];
+            amount = amounts[i];
+
+            // change the nonce
+            _metaNonces[sender] = nonces[i];
+
+            // transfer tokens
+            _balances[sender] -= (amount + relayerFees[i]);
+            _balances[recipient] += amount;
+            _balances[msg.sender] += relayerFees[i];
+        }
+
+        return true;
+    }
+```
+
+Results (for Test #5 - all validation removed, only meta nonce change and token transfers left):
+
+- 1 meta tx in the batch: 81694/meta tx (total gas: 81694)
+- 5 meta txs in the batch: 57419.8/meta tx (total gas: 287099)
+- 10 meta txs in the batch: 54389.9/meta tx (total gas: 543899)
+- 50 meta txs in the batch: 51961.68/meta tx (total gas: 2598084)
+- 100 meta txs in the batch: 51664.27/meta tx (total gas: 5166427)
+
+The results slightly improved, but are still above 51000 gas per meta tx.
+
+Let's try to remove the nonce change.
+
+**2) Only token transfers (without meta nonce change)**
+
+```solidity
+    function processMetaBatch(address[] memory senders,
+                              address[] memory recipients,
+                              uint256[] memory amounts,
+                              uint256[] memory relayerFees,
+                              uint256[] memory nonces,
+                              uint8[] memory sigV,
+                              bytes32[] memory sigR,
+                              bytes32[] memory sigS) public returns (bool) {
+        
+        address sender;
+        address recipient;
+        uint256 amount;
+        uint256 i;
+
+        // loop through all meta txs
+        for (i = 0; i < senders.length; i++) {
+            sender = senders[i];
+            recipient = recipients[i];
+            amount = amounts[i];
+
+            // transfer tokens
+            _balances[sender] -= (amount + relayerFees[i]);
+            _balances[recipient] += amount;
+            _balances[msg.sender] += relayerFees[i];
+        }
+
+        return true;
+    }
+```
+
+Results (for Test #5 - all validation removed, no meta nonce change, only token transfers):
+
+- 1 meta tx in the batch: 61541/meta tx (total gas: 61541)
+- 5 meta txs in the batch: 37262/meta tx (total gas: 186310)
+- 10 meta txs in the batch: 34234.5/meta tx (total gas: 342345)
+- 50 meta txs in the batch: 31807/meta tx (total gas: 1590350)
+- 100 meta txs in the batch: 31511.39/meta tx (total gas: 3151139)
+
+While nonce is an important security feature, it seems that removing it shows **significant** gas reductions.
+
+In this case, it might be good to try to change the way nonces are stored. Instead of its own array, nonces could be joined with token balances in a 2D array.
 
 ## Feedback
 

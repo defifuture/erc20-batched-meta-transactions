@@ -1,6 +1,6 @@
 const ERC20MetaBatch = artifacts.require("ERC20MetaBatch");
 
-const testRounds = 5; // set number of meta txs that you want to be sent in one batch (for all tests below)
+const testRounds = 10; // set number of meta txs that you want to be sent in one batch (for all tests below)
 
 function sliceSignature(signature) {
     let r = signature.slice(0, 66);
@@ -15,59 +15,23 @@ function sliceSignature(signature) {
     return {r, s, v};
 }
 
-contract("#1 accountOne (relayer/sender/receiver), number of meta txs: 1", async accounts => {
-    
-    it("#1 should calculate gas cost if sender/relayer/receiver is the same address (1 meta tx)", async() => {
+contract("Test #1: reference point - a normal on-chain token transfer tx", async accounts => {
+    it("#1 should send tokens from one address to another (not a meta tx)", async() => {
         let instance = await ERC20MetaBatch.deployed();
-
-        let accountOne = accounts[0];  // relayer, sender, and receiver
-
-        let balanceOne = await instance.balanceOf(accountOne);
-        assert.equal(parseInt(balanceOne), 10000000);
-
+        let sender = accounts[0];
+        let receiver = accounts[1];
+        
         let amount = 10;
-        let relayerFee = 1;
 
-        let lastNonce = await instance.nonceOf(accountOne);
-        assert.equal(parseInt(lastNonce), 0);
-        let newNonce = parseInt(lastNonce) + 1
+        let result = await instance.transfer(receiver, amount);
+        console.log("Gas used for #1: " + result.receipt.gasUsed + "/tx");
 
-        // get a current block number
-        let currentBlockNumber = await web3.eth.getBlockNumber();
-        let dueBlockNumber = currentBlockNumber + 3;
-
-        let valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
-                                                          [accountOne, accountOne, amount, relayerFee, newNonce, dueBlockNumber, instance.address, accountOne]);
-
-        let hash = web3.utils.keccak256(valuesEncoded);
-
-        // create a signature
-        let signature = await web3.eth.sign(hash, accountOne);
-        let sigSlices = sliceSignature(signature);
-
-        // send meta batch tx
-        let result = await instance.processMetaBatch([accountOne],
-                                                     [accountOne],
-                                                     [amount],
-                                                     [relayerFee],
-                                                     [newNonce],
-                                                     [dueBlockNumber],
-                                                     [sigSlices.v],
-                                                     [sigSlices.r],
-                                                     [sigSlices.s]);
-
-        console.log("Gas used for #1: " + result.receipt.gasUsed + "/meta tx");
-
-        balanceOne = await instance.balanceOf(accountOne);
-        assert.equal(parseInt(balanceOne), 10000000);
-
-        let currentNonce = await instance.nonceOf(accountOne);
-        assert.equal(parseInt(currentNonce), 1);
+        let balanceReceiver = await instance.balanceOf(receiver);
+        assert.equal(balanceReceiver, 10)
     });
-
 });
 
-contract("#2 accountOne (relayer/sender/receiver), number of meta txs: " + testRounds, async accounts => {
+contract("Test #2: 1 address (relayer/sender/receiver); number of meta txs: " + testRounds, async accounts => {
     it("#2 should process" + testRounds + " txs where relayer/sender/receiver is the same address", async() => {
         let instance = await ERC20MetaBatch.deployed();
 
@@ -146,7 +110,7 @@ contract("#2 accountOne (relayer/sender/receiver), number of meta txs: " + testR
     });
 });
 
-contract("#3 accountOne (relayer/sender), accountTwo (receiver), number of meta txs: " + testRounds, async accounts => {
+contract("Test #3: 2 addresses (one is relayer/sender, the other is receiver); number of meta txs: " + testRounds, async accounts => {
     it("#3 should process " + testRounds + " txs where relayer/sender is the one address, and receiver is another", async() => {
         let instance = await ERC20MetaBatch.deployed();
 
@@ -223,7 +187,7 @@ contract("#3 accountOne (relayer/sender), accountTwo (receiver), number of meta 
     });
 });
 
-contract("#4 relayer/sender (accountOne), receiver (" + testRounds + " different addresses), number of meta txs: " + testRounds, async accounts => {
+contract("Test #4: relayer/sender is 1 address, receivers are " + testRounds + " different addresses; number of meta txs: " + testRounds, async accounts => {
     it("#4 should process " + testRounds + " txs where relayer/sender is the one address, and receiver is always a different address", async() => {
         let instance = await ERC20MetaBatch.deployed();
 
@@ -307,25 +271,9 @@ contract("#4 relayer/sender (accountOne), receiver (" + testRounds + " different
     });
 });
 
-contract("#5 comparison - normal on-chain token transfer tx", async accounts => {
-    it("#5 should send tokens from one address to another (not a meta tx)", async() => {
-        let instance = await ERC20MetaBatch.deployed();
-        let sender = accounts[0];
-        let receiver = accounts[1];
-        
-        let amount = 10;
-
-        let result = await instance.transfer(receiver, amount);
-        console.log("Gas used for #5: " + result.receipt.gasUsed + "/tx");
-
-        let balanceReceiver = await instance.balanceOf(receiver);
-        assert.equal(balanceReceiver, 10)
-    });
-});
-
-contract("#6 relayer (accountOne), " + testRounds + " senders, " + testRounds + " receivers, number of meta txs: " + testRounds, async accounts => {    
+contract("Test #5: relayer is 1 address (never a sender/receiver), " + testRounds + " senders, " + testRounds + " receivers; number of meta txs: " + testRounds, async accounts => {    
     
-    it("#6 should process " + testRounds + " txs with " + testRounds + " senders and " + testRounds + " receivers", async() => {
+    it("#5 should process " + testRounds + " txs with " + testRounds + " senders and " + testRounds + " receivers", async() => {
         let instance = await ERC20MetaBatch.deployed();
 
         let relayer = accounts[0];  // contract creator and token holder
@@ -410,7 +358,7 @@ contract("#6 relayer (accountOne), " + testRounds + " senders, " + testRounds + 
         // console.log(result);
 
         let gasUsed = result.receipt.gasUsed;
-        console.log("Gas used for #6: " + gasUsed/testRounds + "/meta tx (total gas: " + gasUsed + ")");
+        console.log("Gas used for #5: " + gasUsed/testRounds + "/meta tx (total gas: " + gasUsed + ")");
         
         // balance of a sender AFTER sending a batch of tokens
         balanceSender1 = await instance.balanceOf(senders[0]);
