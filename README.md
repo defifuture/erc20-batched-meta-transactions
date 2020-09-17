@@ -347,7 +347,8 @@ In order to test the gas efficiency of the `processMetaBatch()` function, I deci
 - **Test #2:** A `processMetaBatch()` transaction where relayer, sender and receiver in all meta transactions is the same address (1 sender/relayer/receiver for M meta transactions).
 - **Test #3:** A `processMetaBatch()` transaction where relayer and sender are one address, and receiver is another one - in all meta transactions (1 sender/relayer, 1 receiver for M meta transactions).
 - **Test #4:** A `processMetaBatch()` transaction where relayer and sender are one address, but receiver is a different address in every meta transaction (1 sender/relayer, M receivers for M meta transactions).
-- **Test #5:** A `processMetaBatch()` transaction where relayer is one address, but senders and receivers are a different address (even from each other) in every meta transaction (1 relayer, M senders, M receivers for M meta transactions). This test is **the most important** one for the hypothesis.
+- **Test #5:** A `processMetaBatch()` transaction where relayer is one address, senders are many addresses (different in every meta tx), and receiver is 1 address which the same in every meta tx (1 relayer, M senders, 1 receiver for M meta transactions).
+- **Test #6:** A `processMetaBatch()` transaction where relayer is one address, but senders and receivers are a different address (even from each other) in every meta transaction (1 relayer, M senders, M receivers for M meta transactions). This test is **the most important** one for the hypothesis.
 
 All the tests were run with different batch sizes:
 
@@ -387,21 +388,29 @@ All the tests were run with different batch sizes:
 - 50 meta txs in the batch: 36215.16/meta tx (total gas: 1810758)
 - 100 meta txs in the batch: 35759.56/meta tx (total gas: 3575956)
 
-**Test #5 (1 relayer, M senders, M receivers for M meta transactions):**
+**Test #5 (1 relayer, M senders, 1 receiver for M meta transactions):**
 
 - 1 meta tx in the batch: 89581/meta tx (total gas: 89581)
+- 5 meta txs in the batch: 49415.6/meta tx (total gas: 247078)
+- 10 meta txs in the batch: 44394/meta tx (total gas: 443940)
+- 50 meta txs in the batch: 40415.16/meta tx (total gas: 2020758)
+- 100 meta txs in the batch: 39960.4/meta tx (total gas: 3996040)
+
+**Test #6 (1 relayer, M senders, M receivers for M meta transactions):**
+
+- 1 meta tx in the batch: 89593/meta tx (total gas: 89593)
 - 5 meta txs in the batch: 64775.6/meta tx (total gas: 323878)
 - 10 meta txs in the batch: 61671.6/meta tx (total gas: 616716)
 - 50 meta txs in the batch: 59227.08/meta tx (total gas: 2961354)
 - 100 meta txs in the batch: 58966.48/meta tx (total gas: 5896648)
 
-As you can see, Test #5 (the most important test for this hypothesis) never comes below the reference point. Which means that using normal on-chain token transfers is more gas efficient than using `processMetaBatch()` function in the form in which is coded in this proposal. 
+As you can see, Test #6 (the most important test for this hypothesis) never comes below the reference point. Which means that using normal on-chain token transfers is more gas efficient than using `processMetaBatch()` function in the form in which is coded in this proposal. 
 
 That said, there might be a more efficient way to code it. See additional test runs below for a potential bottleneck.
 
-### Additional test runs for Test #5 to find a bottleneck
+### Additional test runs for Test #6 to find a bottleneck
 
-Additional test runs (only for Test #5) were performed where the `processMetaBatch()` function was stripped of all validation and did only token transfers (note that the parameters were kept the same, except the `blocks` parameter was removed). 
+Additional test runs (only for Test #6) were performed where the `processMetaBatch()` function was stripped of all validation and did only token transfers (note that the parameters were kept the same, except the `blocks` parameter was removed). 
 
 In the first test run the nonce change is present, while in the second test run it is not. The difference is quite significant.
 
@@ -441,7 +450,7 @@ In the first test run the nonce change is present, while in the second test run 
     }
 ```
 
-Results (for Test #5 - all validation removed, only meta nonce change and token transfers left):
+Results (for Test #6 - all validation removed, only meta nonce change and token transfers left):
 
 - 1 meta tx in the batch: 81694/meta tx (total gas: 81694)
 - 5 meta txs in the batch: 57419.8/meta tx (total gas: 287099)
@@ -486,7 +495,7 @@ Let's try to remove the nonce change.
     }
 ```
 
-Results (for Test #5 - all validation removed, no meta nonce change, only token transfers):
+Results (for Test #6 - all validation removed, no meta nonce change, only token transfers):
 
 - 1 meta tx in the batch: 61541/meta tx (total gas: 61541)
 - 5 meta txs in the batch: 37262/meta tx (total gas: 186310)
@@ -530,7 +539,7 @@ _balancesNonces[account][0] += amount; // add amount to balance
 _balancesNonces[account][1] += 1; // raise nonce by one
 ```
 
-**How has the gas usage improve?**
+**How has the gas usage improve after doing a new round of tests?**
 
 By absolutely nothing. No impact whatsoever.
 
@@ -538,10 +547,10 @@ By absolutely nothing. No impact whatsoever.
 
 Batched meta transactions (at least in this implementation) **do not reduce gas cost for M-to-M transactions** (many senders - many receivers). Note that this means that all senders and all receivers are unique addresses (no duplicates) and that receivers have not hold any tokens before.
 
-Where we have seen gas reductions were the 1-to-1 (1 sender - 1 receiver) and 1-to-M (1 sender, many receivers - probably the same vice-versa) examples. So batched meta transactions may still make sense for some use cases, for example the following:
+Where we have seen gas reductions were the 1-to-1 (1 sender - 1 receiver), 1-to-M (1 sender, many receivers), and M-to-1 (M senders, 1 receiver) examples. So **batched meta transactions may still make sense for some use cases**, for example, the following:
 
-- 1 sender wanting to send tokens to many receivers (for example a project sending weekly token rewards, like Balancer)
-- Many senders sending tokens to 1 receiver (a deposit to a lock contract in order to access L2 - if a bridge to L2 is configured this way)
+- 1 sender wanting to send tokens to many receivers (for example a project sending weekly token rewards, like Balancer). But in this case, a solution like [Disperse.app](https://disperse.app/) makes more sense, because there is no need for a separate relayer and also no need to sign each meta tx (because the whole on-chain tx is already signed).
+- Many senders sending tokens to 1 receiver (example: a deposit to a lock contract in order to access L2 - if a bridge to L2 is configured this way)
 
 ## Feedback
 
