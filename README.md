@@ -8,7 +8,7 @@ This article takes the concept one step further and implements an ERC-20 extensi
 
 The **hypothesis** was that such **batching would lower the transaction cost** (per meta transaction). But as it turns out, a batch of meta transactions sent from many users to many recipients (M-to-M), **has a higher gas cost** (per meta tx) than a normal on-chain token transfer.
 
-Batched meta transactions are **only gas cost-effective for 1-to-**M (1 sender, many recipients) **and M-to-1** (many senders, 1 recipient) use cases.
+Batched meta transactions are **only gas cost-effective for 1-to-M** (1 sender, many recipients) **and M-to-1** (many senders, 1 recipient) use cases, where gas savings are 34% and 25% (in case of 100 meta txs), respectively.
 
 ## The problem
 
