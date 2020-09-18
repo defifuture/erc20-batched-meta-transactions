@@ -45,27 +45,23 @@ function processMetaBatch(address[] memory senders,
                           address[] memory recipients, 
                           uint256[] memory amounts,
                           uint256[] memory relayerFees,
-                          uint256[] memory nonces,
                           uint256[] memory blocks,
                           uint8[] memory sigV,
                           bytes32[] memory sigR,
                           bytes32[] memory sigS) public returns (bool) {
 
-    // declare some variables before the loop for better gas efficiency
     address sender;
-    address recipient;
-    uint256 amount;
-    bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+    uint256 newNonce;
+    uint256 relayerFeesSum = 0;
     bytes32 msgHash;
     uint256 i;
 
     // loop through all meta txs
     for (i = 0; i < senders.length; i++) {
         sender = senders[i];
-        recipient = recipients[i];
-        amount = amounts[i];
+        newNonce = _metaNonces[sender] + 1;
 
-        if(sender == address(0) || recipient == address(0)) {
+        if(sender == address(0) || recipients[i] == address(0)) {
             continue; // sender or recipient is 0x0 address, skip this meta tx
         }
 
@@ -74,30 +70,27 @@ function processMetaBatch(address[] memory senders,
             continue; // if current block number is bigger than the requested number, skip this meta tx
         }
 
-        // check if the new nonce is bigger than the previous one by exactly 1
-        if(nonces[i] != nonceOf(sender) + 1) {
-            continue; // if nonce is not bigger by exactly 1 than the previous nonce (for the same sender), skip this meta tx
-        }
-
         // check if meta tx sender's balance is big enough
-        if(_balances[sender] < (amount + relayerFees[i])) {
+        if(_balances[sender] < (amounts[i] + relayerFees[i])) {
             continue; // if sender's balance is less than the amount and the relayer fee, skip this meta tx
         }
 
         // check if the signature is valid
-        msgHash = keccak256(abi.encode(sender, recipient, amount, relayerFees[i], nonces[i], blocks[i], address(this), msg.sender));
-        if(sender != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i], sigR[i], sigS[i])) {
+        msgHash = keccak256(abi.encode(sender, recipients[i], amounts[i], relayerFees[i], newNonce, blocks[i], address(this), msg.sender));
+        if(sender != ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", msgHash)), sigV[i], sigR[i], sigS[i])) {
             continue; // if sig is not valid, skip to the next meta tx
         }
 
         // set a new nonce for the sender
-        _metaNonces[sender] = nonces[i];
+        _metaNonces[sender] = newNonce;
 
         // transfer tokens
-        _balances[sender] -= (amount + relayerFees[i]);
-        _balances[recipient] += amount;
-        _balances[msg.sender] += relayerFees[i];
+        _balances[sender] -= (amounts[i] + relayerFees[i]);
+        _balances[recipients[i]] += amounts[i];
+        relayerFeesSum += relayerFees[i];
     }
+
+    _balances[msg.sender] += relayerFeesSum;
 
     return true;
 }
@@ -109,7 +102,6 @@ As you can see, the `processMetaBatch()` function takes the following parameters
 - an array of receiver addresses
 - an array of amounts
 - an array of relayer fees (relayer is `msg.sender`)
-- an array of nonces
 - an array of block numbers (due "date" for meta tx to be processed)
 - Three arrays that represent parts of a signature (v, r, s)
 
@@ -145,7 +137,7 @@ function nonceOf(address account) public view returns (uint256) {
 - receiver address
 - token amount to be transfered - uint256
 - relayer fee (in tokens) - uint256
-- nonce - uint256 (replay protection within the token contract)
+- **nonce** (replay protection within the token contract)
 - block number - uint256 (a block by which the meta tx must be processed)
 - **token contract address** (replay protection across different token contracts)
 - **the relayer address** (front-running protection)
@@ -169,7 +161,6 @@ function processMetaBatch(address[] memory senders,
                           address[] memory recipients, 
                           uint256[] memory amounts,
                           uint256[] memory relayerFees,
-                          uint256[] memory nonces,
                           uint256[] memory blocks,
                           uint8[] memory sigV,
                           bytes32[] memory sigR,
@@ -212,13 +203,9 @@ Signing a meta transaction and validating the signature is crucial for this whol
 The `processMetaBatch()` function validates a meta tx signature, and if it's **invalid**, the meta tx is **skipped** (but the whole on-chain transaction is **not reverted**).
 
 ```solidity
-bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+bytes32 msgHash = keccak256(abi.encode(sender, recipients[i], amounts[i], relayerFees[i], newNonce, blocks[i], address(this), msg.sender));
 
-//...
-
-bytes32 msgHash = keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayerFees[i], nonces[i], address(this), msg.sender));
-
-if(senders[i] != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i], sigR[i], sigS[i])) {
+if(senders[i] != ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", msgHash)), sigV[i], sigR[i], sigS[i])) {
     continue; // if sig is not valid, skip to the next meta tx in the loop
 }
 ```
@@ -262,11 +249,9 @@ A malicious relayer could scout the Ethereum mempool to steal meta transactions 
 When the `processMetaBatch()` function generates a hash it includes the `msg.sender` address in it:
 
 ```solidity
-bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+bytes32 msgHash = keccak256(abi.encode(sender, recipients[i], amounts[i], relayerFees[i], newNonce, blocks[i], address(this), msg.sender));
 
-bytes32 msgHash = keccak256(abi.encode(senders[i], recipients[i], amounts[i], relayerFees[i], nonces[i], address(this), msg.sender));
-
-if(senders[i] != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i], sigR[i], sigS[i])) {
+if(senders[i] != ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", msgHash)), sigV[i], sigR[i], sigS[i])) {
     continue; // if sig is not valid, skip to the next meta tx in the loop
 }
 ```
@@ -366,43 +351,43 @@ All the tests were run with different batch sizes:
 
 **Test #2 (1 sender/relayer/receiver for M meta transactions):**
 
-- 1 meta tx in the batch: 61981/meta tx (total gas: 61981)
-- 5 meta txs in the batch: 25173.2/meta tx (total gas: 125866)
-- 10 meta txs in the batch: 20574/meta tx (total gas: 205740)
-- 50 meta txs in the batch: 16930.2/meta tx (total gas: 846510)
-- 100 meta txs in the batch: 16519.72/meta tx (total gas: 1651972)
+- 1 meta tx in the batch: 61066/meta tx (total gas: 61066)
+- 5 meta txs in the batch: 23431.2/meta tx (total gas: 117156)
+- 10 meta txs in the batch: 18729.4/meta tx (total gas: 187294)
+- 50 meta txs in the batch: 15001.26/meta tx (total gas: 750063)
+- 100 meta txs in the batch: 14572.79/meta tx (total gas: 1457279)
 
 **Test #3 (1 sender/relayer, 1 receiver for M meta transactions):**
 
-- 1 meta tx in the batch: 85393/meta tx (total gas: 85393)
-- 5 meta txs in the batch: 29848.4/meta tx (total gas: 149242)
-- 10 meta txs in the batch: 22917.6/meta tx (total gas: 229176)
-- 50 meta txs in the batch: 17399.16/meta tx (total gas: 869958)
-- 100 meta txs in the batch: 16753.24/meta tx (total gas: 1675324)
+- 1 meta tx in the batch: 84466/meta tx (total gas: 84466)
+- 5 meta txs in the batch: 28111.2/meta tx (total gas: 140556)
+- 10 meta txs in the batch: 21071.8/meta tx (total gas: 210718)
+- 50 meta txs in the batch: 15467.58/meta tx (total gas: 773379)
+- 100 meta txs in the batch: 14805.83/meta tx (total gas: 1480583)
 
 **Test #4 (1 sender/relayer, M receivers for M meta transactions):**
 
-- 1 meta tx in the batch: 85393/meta tx (total gas: 85393)
-- 5 meta txs in the batch: 45215.6/meta tx (total gas: 226078)
-- 10 meta txs in the batch: 40195.2/meta tx (total gas: 401952)
-- 50 meta txs in the batch: 36215.16/meta tx (total gas: 1810758)
-- 100 meta txs in the batch: 35759.56/meta tx (total gas: 3575956)
+- 1 meta tx in the batch: 84466/meta tx (total gas: 84466)
+- 5 meta txs in the batch: 43471.2/meta tx (total gas: 217356)
+- 10 meta txs in the batch: 38347/meta tx (total gas: 383470)
+- 50 meta txs in the batch: 34283.1/meta tx (total gas: 1714155)
+- 100 meta txs in the batch: 33813.11/meta tx (total gas: 3381311)
 
 **Test #5 (1 relayer, M senders, 1 receiver for M meta transactions):**
 
-- 1 meta tx in the batch: 89581/meta tx (total gas: 89581)
-- 5 meta txs in the batch: 49415.6/meta tx (total gas: 247078)
-- 10 meta txs in the batch: 44394/meta tx (total gas: 443940)
-- 50 meta txs in the batch: 40415.16/meta tx (total gas: 2020758)
-- 100 meta txs in the batch: 39960.4/meta tx (total gas: 3996040)
+- 1 meta tx in the batch: 88666/meta tx (total gas: 88666)
+- 5 meta txs in the batch: 47673.6/meta tx (total gas: 238368)
+- 10 meta txs in the batch: 42553/meta tx (total gas: 425530)
+- 50 meta txs in the batch: 38485.5/meta tx (total gas: 1924275)
+- 100 meta txs in the batch: 38025.83/meta tx (total gas: 3802583)
 
 **Test #6 (1 relayer, M senders, M receivers for M meta transactions):**
 
-- 1 meta tx in the batch: 89593/meta tx (total gas: 89593)
-- 5 meta txs in the batch: 64775.6/meta tx (total gas: 323878)
-- 10 meta txs in the batch: 61671.6/meta tx (total gas: 616716)
-- 50 meta txs in the batch: 59227.08/meta tx (total gas: 2961354)
-- 100 meta txs in the batch: 58966.48/meta tx (total gas: 5896648)
+- 1 meta tx in the batch: 88666/meta tx (total gas: 88666)
+- 5 meta txs in the batch: 63031.2/meta tx (total gas: 315156)
+- 10 meta txs in the batch: 59833/meta tx (total gas: 598330)
+- 50 meta txs in the batch: 57298.86/meta tx (total gas: 2864943)
+- 100 meta txs in the batch: 57032.51/meta tx (total gas: 5703251)
 
 As you can see, Test #6 (the most important test for this hypothesis) never comes below the reference point. Which means that using normal on-chain token transfers is more gas efficient than using `processMetaBatch()` function in the form in which is coded in this proposal. 
 
@@ -421,30 +406,31 @@ In the first test run the nonce change is present, while in the second test run 
                               address[] memory recipients,
                               uint256[] memory amounts,
                               uint256[] memory relayerFees,
-                              uint256[] memory nonces,
                               uint8[] memory sigV,
                               bytes32[] memory sigR,
                               bytes32[] memory sigS) public returns (bool) {
         
         address sender;
-        address recipient;
-        uint256 amount;
+        uint256 newNonce;
+        uint256 relayerFeesSum = 0;
+        bytes32 msgHash;
         uint256 i;
 
         // loop through all meta txs
         for (i = 0; i < senders.length; i++) {
             sender = senders[i];
-            recipient = recipients[i];
-            amount = amounts[i];
+            newNonce = _metaNonces[sender] + 1;
 
-            // change the nonce
-            _metaNonces[sender] = nonces[i];
+            // set a new nonce for the sender
+            _metaNonces[sender] = newNonce;
 
             // transfer tokens
-            _balances[sender] -= (amount + relayerFees[i]);
-            _balances[recipient] += amount;
-            _balances[msg.sender] += relayerFees[i];
+            _balances[sender] -= (amounts[i] + relayerFees[i]);
+            _balances[recipients[i]] += amounts[i];
+            relayerFeesSum += relayerFees[i];
         }
+
+        _balances[msg.sender] += relayerFeesSum;
 
         return true;
     }
@@ -469,27 +455,26 @@ Let's try to remove the nonce change.
                               address[] memory recipients,
                               uint256[] memory amounts,
                               uint256[] memory relayerFees,
-                              uint256[] memory nonces,
                               uint8[] memory sigV,
                               bytes32[] memory sigR,
                               bytes32[] memory sigS) public returns (bool) {
         
         address sender;
-        address recipient;
-        uint256 amount;
+        uint256 relayerFeesSum = 0;
+        bytes32 msgHash;
         uint256 i;
 
         // loop through all meta txs
         for (i = 0; i < senders.length; i++) {
             sender = senders[i];
-            recipient = recipients[i];
-            amount = amounts[i];
 
             // transfer tokens
-            _balances[sender] -= (amount + relayerFees[i]);
-            _balances[recipient] += amount;
-            _balances[msg.sender] += relayerFees[i];
+            _balances[sender] -= (amounts[i] + relayerFees[i]);
+            _balances[recipients[i]] += amounts[i];
+            relayerFeesSum += relayerFees[i];
         }
+
+        _balances[msg.sender] += relayerFeesSum;
 
         return true;
     }
@@ -503,7 +488,7 @@ Results (for Test #6 - all validation removed, no meta nonce change, only token 
 - 50 meta txs in the batch: 31807/meta tx (total gas: 1590350)
 - 100 meta txs in the batch: 31511.39/meta tx (total gas: 3151139)
 
-While nonce is an important security feature, it seems that removing it shows **significant** gas reductions.
+While nonce is an **important security feature**, it seems that removing it shows **significant** gas reductions.
 
 In this case, it might be good to try to change the way nonces are stored. Instead of its own mapping, nonces mapping could be joined with token balances into one mapping.
 
@@ -550,7 +535,7 @@ Batched meta transactions (at least in this implementation) **do not reduce gas 
 Where we have seen gas reductions were the 1-to-1 (1 sender - 1 receiver), 1-to-M (1 sender, many receivers), and M-to-1 (M senders, 1 receiver) examples. So **batched meta transactions may still make sense for some use cases**, for example, the following:
 
 - 1 sender wanting to send tokens to many receivers (for example a project sending weekly token rewards, like Balancer). But in this case, a solution like [Disperse.app](https://disperse.app/) makes more sense, because there is no need for a separate relayer and also no need to sign each meta tx (because the whole on-chain tx is already signed).
-- Many senders sending tokens to 1 receiver (example: a deposit to a lock contract in order to access L2 - if a bridge to L2 is configured this way)
+- Many senders sending tokens to 1 receiver (example: a deposit to a lock contract in order to access L2 - if a bridge to L2 is configured this way).
 
 ## Feedback
 

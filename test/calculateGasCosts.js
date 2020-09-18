@@ -57,7 +57,6 @@ contract("Test #2 (1 address): relayer/sender/receiver is a single address; numb
         let receivers = [];
         let amounts = [];
         let relayerFees = [];
-        let nonces = [];
         let blocks = [];
         let vs = [];
         let rs = [];
@@ -75,8 +74,6 @@ contract("Test #2 (1 address): relayer/sender/receiver is a single address; numb
             relayerFees.push(relayerFee);
 
             let nonce = 1 + counter;
-            nonces.push(nonce);
-            // console.log(nonce);
 
             blocks.push(dueBlockNumber);
 
@@ -99,8 +96,7 @@ contract("Test #2 (1 address): relayer/sender/receiver is a single address; numb
         // console.log("Counter: " + counter);
 
         // send meta batch tx
-        let result = await instance.processMetaBatch(senders, receivers, amounts, relayerFees, nonces,
-                                                     blocks, vs, rs, ss);
+        let result = await instance.processMetaBatch(senders, receivers, amounts, relayerFees, blocks, vs, rs, ss);
         
         let gasUsed = result.receipt.gasUsed;
         console.log("Gas used for #2: " + gasUsed/testRounds + "/meta tx (total gas: " + gasUsed + ")");
@@ -137,7 +133,6 @@ contract("Test #3 (1-to-1): 2 addresses (one is relayer/sender, the other is rec
         let receivers = [];
         let amounts = [];
         let relayerFees = [];
-        let nonces = [];
         let blocks = [];
         let vs = [];
         let rs = [];
@@ -155,8 +150,6 @@ contract("Test #3 (1-to-1): 2 addresses (one is relayer/sender, the other is rec
             relayerFees.push(relayerFee);
 
             let nonce = 1 + counter;
-            nonces.push(nonce);
-            // console.log(nonce);
 
             blocks.push(dueBlockNumber);
 
@@ -179,8 +172,7 @@ contract("Test #3 (1-to-1): 2 addresses (one is relayer/sender, the other is rec
         // console.log("Counter: " + counter);
 
         // send meta batch tx
-        let result = await instance.processMetaBatch(senders, receivers, amounts, relayerFees, nonces,
-                                                     blocks, vs, rs, ss);
+        let result = await instance.processMetaBatch(senders, receivers, amounts, relayerFees, blocks, vs, rs, ss);
 
         let gasUsed = result.receipt.gasUsed;
         console.log("Gas used for #3: " + gasUsed/testRounds + "/meta tx (total gas: " + gasUsed + ")");
@@ -214,7 +206,6 @@ contract("Test #4 (1-to-M): sender is 1 address, receivers are " + testRounds + 
         let receivers = [];
         let amounts = [];
         let relayerFees = [];
-        let nonces = [];
         let blocks = [];
         let vs = [];
         let rs = [];
@@ -236,8 +227,6 @@ contract("Test #4 (1-to-M): sender is 1 address, receivers are " + testRounds + 
             relayerFees.push(relayerFee);
 
             let nonce = 1 + counter;
-            nonces.push(nonce);
-            // console.log(nonce);
 
             blocks.push(dueBlockNumber);
 
@@ -260,8 +249,7 @@ contract("Test #4 (1-to-M): sender is 1 address, receivers are " + testRounds + 
         // console.log("Counter: " + counter);
 
         // send meta batch tx
-        let result = await instance.processMetaBatch(senders, receivers, amounts, relayerFees, nonces,
-                                                     blocks, vs, rs, ss);
+        let result = await instance.processMetaBatch(senders, receivers, amounts, relayerFees, blocks, vs, rs, ss);
 
         let gasUsed = result.receipt.gasUsed;
         console.log("Gas used for #4: " + gasUsed/testRounds + "/meta tx (total gas: " + gasUsed + ")");
@@ -306,7 +294,6 @@ contract("Test #5 (M-to-1): " + testRounds + " senders, 1 receiver; number of me
         let receivers = [];
         let amounts = [];
         let relayerFees = [];
-        let nonces = [];
         let blocks = [];
         let vs = [];
         let rs = [];
@@ -329,9 +316,6 @@ contract("Test #5 (M-to-1): " + testRounds + " senders, 1 receiver; number of me
             amounts.push(amount);
 
             relayerFees.push(relayerFee);
-
-            nonces.push(nonce);
-            // console.log(nonce);
 
             blocks.push(dueBlockNumber);
 
@@ -356,8 +340,7 @@ contract("Test #5 (M-to-1): " + testRounds + " senders, 1 receiver; number of me
         assert.equal(parseInt(balanceSender1), amountTokensOnchain);
 
         // send meta batch tx
-        let result = await instance.processMetaBatch(senders, receivers, amounts, relayerFees, nonces,
-                                                     blocks, vs, rs, ss);
+        let result = await instance.processMetaBatch(senders, receivers, amounts, relayerFees, blocks, vs, rs, ss);
         // console.log(result);
 
         let gasUsed = result.receipt.gasUsed;
@@ -408,7 +391,6 @@ contract("Test #6 (M-to-M): " + testRounds + " senders, " + testRounds + " recei
         let receivers = [];
         let amounts = [];
         let relayerFees = [];
-        let nonces = [];
         let blocks = [];
         let vs = [];
         let rs = [];
@@ -433,9 +415,6 @@ contract("Test #6 (M-to-M): " + testRounds + " senders, " + testRounds + " recei
 
             relayerFees.push(relayerFee);
 
-            nonces.push(nonce);
-            // console.log(nonce);
-
             blocks.push(dueBlockNumber);
 
             valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
@@ -459,8 +438,7 @@ contract("Test #6 (M-to-M): " + testRounds + " senders, " + testRounds + " recei
         assert.equal(parseInt(balanceSender1), amountTokensOnchain);
 
         // send meta batch tx
-        let result = await instance.processMetaBatch(senders, receivers, amounts, relayerFees, nonces,
-                                                     blocks, vs, rs, ss);
+        let result = await instance.processMetaBatch(senders, receivers, amounts, relayerFees, blocks, vs, rs, ss);
         // console.log(result);
 
         let gasUsed = result.receipt.gasUsed;

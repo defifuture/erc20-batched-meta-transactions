@@ -67,26 +67,23 @@ contract ERC20MetaBatch is Context, IERC20 {
                               address[] memory recipients,
                               uint256[] memory amounts,
                               uint256[] memory relayerFees,
-                              uint256[] memory nonces,
                               uint256[] memory blocks,
                               uint8[] memory sigV,
                               bytes32[] memory sigR,
                               bytes32[] memory sigS) public returns (bool) {
         
         address sender;
-        address recipient;
-        uint256 amount;
-        bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+        uint256 newNonce;
+        uint256 relayerFeesSum = 0;
         bytes32 msgHash;
         uint256 i;
 
         // loop through all meta txs
         for (i = 0; i < senders.length; i++) {
             sender = senders[i];
-            recipient = recipients[i];
-            amount = amounts[i];
+            newNonce = _metaNonces[sender] + 1;
 
-            if(sender == address(0) || recipient == address(0)) {
+            if(sender == address(0) || recipients[i] == address(0)) {
                 continue; // sender or recipient is 0x0 address, skip this meta tx
             }
 
@@ -95,30 +92,27 @@ contract ERC20MetaBatch is Context, IERC20 {
                 continue; // if current block number is bigger than the requested number, skip this meta tx
             }
 
-            // check if the new nonce is bigger than the previous one by exactly 1
-            if(nonces[i] != nonceOf(sender) + 1) {
-                continue; // if nonce is not bigger by exactly 1 than the previous nonce (for the same sender), skip this meta tx
-            }
-
             // check if meta tx sender's balance is big enough
-            if(_balances[sender] < (amount + relayerFees[i])) {
+            if(_balances[sender] < (amounts[i] + relayerFees[i])) {
                 continue; // if sender's balance is less than the amount and the relayer fee, skip this meta tx
             }
 
             // check if the signature is valid
-            msgHash = keccak256(abi.encode(sender, recipient, amount, relayerFees[i], nonces[i], blocks[i], address(this), msg.sender));
-            if(sender != ecrecover(keccak256(abi.encodePacked(prefix, msgHash)), sigV[i], sigR[i], sigS[i])) {
+            msgHash = keccak256(abi.encode(sender, recipients[i], amounts[i], relayerFees[i], newNonce, blocks[i], address(this), msg.sender));
+            if(sender != ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", msgHash)), sigV[i], sigR[i], sigS[i])) {
                 continue; // if sig is not valid, skip to the next meta tx
             }
 
             // set a new nonce for the sender
-            _metaNonces[sender] = nonces[i];
+            _metaNonces[sender] = newNonce;
 
             // transfer tokens
-            _balances[sender] -= (amount + relayerFees[i]);
-            _balances[recipient] += amount;
-            _balances[msg.sender] += relayerFees[i];
+            _balances[sender] -= (amounts[i] + relayerFees[i]);
+            _balances[recipients[i]] += amounts[i];
+            relayerFeesSum += relayerFees[i];
         }
+
+        _balances[msg.sender] += relayerFeesSum;
 
         return true;
     }
