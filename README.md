@@ -540,11 +540,21 @@ _balancesNonces[account][1] += 1; // raise nonce by one
 
 By absolutely nothing. No impact whatsoever.
 
+## Bonus: Test #7 (M-to-M, but receivers have an existing non-null balance)
+
+In Test #6 all the receivers are new token holders (they had a 0 balance before the batch transaction). In Test #7, I'd like to test gas usage in case the recipients already had prior token balance:
+
+- 1 meta tx in the batch: 73678/meta tx (total gas: 73678)
+- 5 meta txs in the batch: 48038.4/meta tx (total gas: 240192)
+- 10 meta txs in the batch: 44842.6/meta tx (total gas: 448426)
+- 50 meta txs in the batch: 42310.62/meta tx (total gas: 2115531)
+- 100 meta txs in the batch: 42032.75/meta tx (total gas: 4203275)
+
 ## Conclusion
 
-Batched meta transactions (at least in this implementation) **do not reduce the gas cost for M-to-M transactions** (many senders - many receivers). Note that this means that all senders and all receivers are unique addresses (no duplicates) and that receivers have not held any tokens before.
+Batched meta transactions (at least in this implementation) **do not reduce the gas cost for M-to-M transactions** (many senders - many receivers). Note that this means that all senders and all receivers are unique addresses (no duplicates) and that **receivers have not held any tokens before**.
 
-Where we have seen gas reductions were the 1-to-1 (1 sender - 1 receiver), 1-to-M (1 sender, many receivers), and M-to-1 (M senders, 1 receiver) examples. So **batched meta transactions may still make sense for some use cases**, for example, the following:
+Where we have seen gas reductions were the 1-to-1 (1 sender - 1 receiver), 1-to-M (1 sender, many receivers), M-to-1 (M senders, 1 receiver), and M-to-M (if receivers held non-null token balance before) examples. So **batched meta transactions may still make sense for some use cases**, for example, the following:
 
 - 1 sender wanting to send tokens to many receivers (for example a project sending weekly token rewards, like Balancer). But in this case, a solution like [Disperse.app](https://disperse.app/) makes more sense, because there is no need for a separate relayer and also no need to sign each meta tx (because the whole on-chain tx is already signed).
 - Many senders sending tokens to 1 receiver (example: a deposit to a lock contract in order to access L2 - if a bridge to L2 is configured this way).
@@ -552,3 +562,5 @@ Where we have seen gas reductions were the 1-to-1 (1 sender - 1 receiver), 1-to-
 ## Feedback
 
 I'm looking forward to your feedback! 🙂 Please share it using GitHub issues or [this Ethereum Magicians topic](https://ethereum-magicians.org/t/batched-meta-transactions-from-multiple-users-is-this-ready-for-an-eip-draft/4613). Thanks!
+
+> P.S.: A huge thanks to Patrick McCorry (@stonecoldpat), Artem Kharlamov (@banteg), and Ronan Sandford (@wighawag) for providing valuable feedback.

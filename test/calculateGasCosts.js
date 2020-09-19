@@ -457,3 +457,109 @@ contract("Test #6 (M-to-M): " + testRounds + " senders, " + testRounds + " recei
         
     });
 });
+
+contract("Test #7 (M-to-M existing): " + testRounds + " senders, " + testRounds + " receivers (with existing non-null balance); number of meta txs: " + testRounds, async accounts => {    
+    
+    it("#7 should process " + testRounds + " txs with " + testRounds + " senders and " + testRounds + " receivers (with existing non-null balance)", async() => {
+        let instance = await ERC20MetaBatch.deployed();
+
+        let relayer = accounts[0];  // contract creator and token holder
+
+        let balanceRelayer = await instance.balanceOf(relayer);
+        assert.equal(parseInt(balanceRelayer), 10000000);
+
+        // instantiate variables
+        let sender;
+        let receiver;
+        let amount = 10;
+        let relayerFee = 1;
+        let nonce = 1; // each sender will only make 1 tx
+        let valuesEncoded;
+        let hash;
+        let sigObject;
+        let sigSlices;
+        let sendTokensOnchain;
+        let sendTokensOnchain2;
+        let amountTokensOnchain = 100;
+
+        // get a current block number
+        let currentBlockNumber = await web3.eth.getBlockNumber();
+        let dueBlockNumber = currentBlockNumber + testRounds*2 + 1;
+
+        let senders = [];
+        let receivers = [];
+        let amounts = [];
+        let relayerFees = [];
+        let blocks = [];
+        let vs = [];
+        let rs = [];
+        let ss = [];
+
+        let counter = 0;
+
+        while(counter < testRounds) {
+            // create a random sender address
+            sender = await web3.eth.accounts.create(web3.utils.randomHex(32));
+            senders.push(sender.address);
+
+            // send 100 tokens on-chain from contract creator to sender
+            // that's why due block number needs to be increased (because this below creates plenty new blocks)
+            sendTokensOnchain = await instance.transfer(sender.address, amountTokensOnchain);
+
+            // create a random receiver address
+            receiver = web3.utils.randomHex(20);
+            receivers.push(receiver);
+
+            // send tokens on-chain to receiver
+            sendTokensOnchain2 = await instance.transfer(receiver, 10);
+            
+            amounts.push(amount);
+
+            relayerFees.push(relayerFee);
+
+            blocks.push(dueBlockNumber);
+
+            valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
+                                                          [sender.address, receiver, amount, relayerFee, nonce, dueBlockNumber, instance.address, relayer]);
+            
+            hash = web3.utils.keccak256(valuesEncoded);
+
+            // create a signature
+            sigObject = await web3.eth.accounts.sign(hash, sender.privateKey);
+            sigSlices = sliceSignature(sigObject.signature);
+
+            vs.push((sigSlices.v));
+            rs.push(sigSlices.r);
+            ss.push(sigSlices.s);
+
+            counter++;
+        }
+
+        // balance of a sender BEFORE sending a batch of tokens (should be 100)
+        let balanceSender1 = await instance.balanceOf(senders[0]);
+        assert.equal(parseInt(balanceSender1), amountTokensOnchain);
+
+        // balance of a sender BEFORE sending a batch of tokens (should be 100)
+        let balanceReceiver1 = await instance.balanceOf(receivers[0]);
+        assert.equal(parseInt(balanceReceiver1), 10);
+
+        // send meta batch tx
+        let result = await instance.processMetaBatch(senders, receivers, amounts, relayerFees, blocks, vs, rs, ss);
+        //console.log(result);
+
+        let gasUsed = result.receipt.gasUsed;
+        console.log("Gas used for #7: " + gasUsed/testRounds + "/meta tx (total gas: " + gasUsed + ")");
+        
+        // balance of a sender AFTER sending a batch of tokens
+        balanceSender1 = await instance.balanceOf(senders[0]);
+        assert.equal(parseInt(balanceSender1), amountTokensOnchain - amount - relayerFee);
+        
+        balanceReceiver1 = await instance.balanceOf(receivers[0]);
+        assert.equal(parseInt(balanceReceiver1), amount + 10);
+
+        balanceRelayer = await instance.balanceOf(relayer);
+        let newRelayerBalance = 10000000 - (testRounds * amountTokensOnchain) - (testRounds * 10) + (testRounds * relayerFee);
+        assert.equal(parseInt(balanceRelayer), newRelayerBalance);
+        
+    });
+});
