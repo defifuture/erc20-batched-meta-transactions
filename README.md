@@ -542,13 +542,17 @@ By absolutely nothing. No impact whatsoever.
 
 ## Bonus: Test #7 (M-to-M, but receivers have an existing non-null balance)
 
-In Test #6 all the receivers are new token holders (they had a 0 balance before the batch transaction). In Test #7, I'd like to test gas usage in case the recipients already had prior token balance:
+In Test #6 all the receivers are new token holders (they had a 0 balance before the batch transaction). In Test #7, I checked the gas usage in case the recipients already had prior token balance:
 
 - 1 meta tx in the batch: 73678/meta tx (total gas: 73678)
 - 5 meta txs in the batch: 48038.4/meta tx (total gas: 240192)
 - 10 meta txs in the batch: 44842.6/meta tx (total gas: 448426)
 - 50 meta txs in the batch: 42310.62/meta tx (total gas: 2115531)
 - 100 meta txs in the batch: 42032.75/meta tx (total gas: 4203275)
+
+As you can see, the gas usage reductions are pretty significant. For 100 meta tx, the tx cost has come down from 57032.51/mtx to 42032.75/mtx.
+
+But it's hard to assure that all the receivers will have an existing non-zero token balance. Although we now know what's the gas usage in the best scenario (42032.75 gas/mtx) and what's in the worst scenario (57032.51 gas/mtx). So every other option falls into that range.
 
 ## Conclusion
 
