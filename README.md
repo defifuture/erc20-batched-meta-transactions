@@ -567,6 +567,14 @@ So **batched meta transactions may still make sense for some use cases**, for ex
 - 1 sender wanting to send tokens to many receivers (for example a project sending weekly token rewards, like Balancer). But in this case, a solution like [Disperse.app](https://disperse.app/) makes more sense, because there is no need for a separate relayer and also no need to sign each meta tx (because the whole on-chain tx is already signed).
 - Many senders sending tokens to 1 receiver (example: a deposit to a lock contract in order to access L2 - if a bridge to L2 is configured this way).
 
+## Sources
+
+1. Griffith, Austin Thomas (2018): [Ethereum Meta Transactions](https://medium.com/@austin_48503/ethereum-meta-transactions-90ccf0859e84), Medium, 10 August 2018.
+2. Kharlamov, Artem (2018): [Disperse Protocol](https://github.com/banteg/disperse-research/blob/master/paper/disperse.pdf), GitHub, 27 November 2018.
+3. Lundfall, Martin (2020): [EIP-2612: permit – 712-signed approvals](https://eips.ethereum.org/EIPS/eip-2612), Ethereum Improvement Proposals, no. 2612, April 2020.
+4. Sandford, Ronan (2019): [ERC-1776 Native Meta Transactions](https://github.com/ethereum/EIPs/issues/1776), GitHub, 25 February 2019.
+5. Weiss, Yoav, Dror Tirosh, Alex Forshtat (2018): [EIP-1613: Gas stations network](https://eips.ethereum.org/EIPS/eip-1613), Ethereum Improvement Proposals, no. 1613, November 2018.
+
 ## Feedback
 
 I'm looking forward to your feedback! 🙂 Please share it using GitHub issues or [this Ethereum Magicians topic](https://ethereum-magicians.org/t/batched-meta-transactions-from-multiple-users-is-this-ready-for-an-eip-draft/4613). Thanks!
