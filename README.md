@@ -558,6 +558,8 @@ But it's hard to assure that all the receivers will have an existing non-zero to
 
 Batched meta transactions (at least in this implementation) **do not reduce the gas cost for M-to-M transactions** (many senders - many receivers). Note that this means that all senders and all receivers are unique addresses (no duplicates) and that **receivers have not held any tokens before**.
 
+![](img/batched-meta-txs-gas-usage-per-batch-size.png)
+
 Where we have seen gas reductions were the 1-to-1 (1 sender - 1 receiver), 1-to-M (1 sender, many receivers), M-to-1 (M senders, 1 receiver), and M-to-M (if receivers held non-null token balance before) examples. So **batched meta transactions may still make sense for some use cases**, for example, the following:
 
 - 1 sender wanting to send tokens to many receivers (for example a project sending weekly token rewards, like Balancer). But in this case, a solution like [Disperse.app](https://disperse.app/) makes more sense, because there is no need for a separate relayer and also no need to sign each meta tx (because the whole on-chain tx is already signed).
