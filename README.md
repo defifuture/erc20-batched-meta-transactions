@@ -334,7 +334,10 @@ This might be possible if all relayers make the on-chain transactions via a spec
 
 But this relayer smart contract would need to have a token spending approval from every user (for each token separately), which would need to be done on-chain, or via the `permit()` function.
 
-More info here: https://github.com/defifuture/relayer-smart-contract 
+More info here: 
+
+- [https://github.com/defifuture/relayer-smart-contract](https://github.com/defifuture/relayer-smart-contract)
+- [https://github.com/defifuture/M-to-1-relayer-smart-contract](https://github.com/defifuture/M-to-1-relayer-smart-contract)
 
 ## Gas used tests
 
@@ -355,9 +358,11 @@ All the tests were run with different batch sizes:
 - 50 meta txs in the batch
 - 100 meta txs in the batch
 
+Each sender is the first time meta tx sender, so their nonce is initially 0. Also, the token receivers don't have any prior token balance. This is important in terms of gas cost (SSTORE), that's why additional tests were conducted later to account for this (tests #7 and #8).
+
 ### Results
 
-**Test #1 (reference point):**
+**Test #1 (reference point/benchmark):**
 
 - Gas cost is always around **51000/tx** (score to beat).
 
@@ -401,9 +406,7 @@ All the tests were run with different batch sizes:
 - 50 meta txs in the batch: 57298.86/meta tx (total gas: 2864943)
 - 100 meta txs in the batch: 57032.51/meta tx (total gas: 5703251)
 
-As you can see, Test #6 (the most important test for this hypothesis) never comes below the reference point. This means that using normal on-chain token transfers is more gas efficient than using `processMetaBatch()` function in the form in which is coded in this proposal. 
-
-That said, there might be a more efficient way to code it. See additional test runs below for a potential bottleneck.
+As you can see, Test #6 never comes below the reference point. This means that using normal on-chain token transfers is more gas efficient than using `processMetaBatch()` function in the form in which is coded in this proposal. 
 
 ### Additional test runs for Test #6 to find a bottleneck
 
@@ -540,32 +543,56 @@ _balancesNonces[account][1] += 1; // raise nonce by one
 
 By absolutely nothing. No impact whatsoever.
 
-## Bonus: Test #7 (M-to-M, but receivers have an existing non-null balance)
+## Bonus: Tests #7 & #8 (M-to-M, both senders and receivers have an existing non-zero balance and non-zero nonce)
 
-In Test #6 all the receivers are new token holders (they had a 0 balance before the batch transaction). In Test #7, I checked the gas usage in case the recipients already had prior token balance:
+In **Test #6** all the receivers are new token holders (they had a 0 balance before the batch transaction) and all the senders are first time meta tx senders (nonce is zero). This is the scenario that is **the most expensive**, because there are plenty of zero values need to be overwritten for the first time.
+
+Based on the [EVM OPCODE gas cost table](https://github.com/djrtwo/evm-opcode-gas-costs/blob/master/opcode-gas-costs_EIP-150_revision-1e18248_2017-04-12.csv), the **SSTORE** action costs 20'000 gas for overwriting a zero value, while overwriting a non-zero value costs merely 5'000 gas.
+
+In Test #6 this happens twice:
+
+1. The initial **balance** of **each receiver** is 0, so it costs 20'000 gas to write a non-zero value.
+2. The same gas cost applies to updating a meta **nonce** of **each sender** from 0 to 1.
+
+While initially this would be a common occurence, after some time there should be more and more transactions where a sender has a non-zero nonce, and both sender and receiver have a non-zero balance. That's why doing tests #7 and #8 makes sense.
+
+### Test #7 (receiver has a non-zero balance)
+
+In Test #7, I checked the gas usage in case the recipients already had prior token balance:
 
 - 1 meta tx in the batch: 73678/meta tx (total gas: 73678)
 - 5 meta txs in the batch: 48038.4/meta tx (total gas: 240192)
 - 10 meta txs in the batch: 44842.6/meta tx (total gas: 448426)
 - 50 meta txs in the batch: 42310.62/meta tx (total gas: 2115531)
-- 100 meta txs in the batch: 42032.75/meta tx (total gas: 4203275)
+- 100 meta txs in the batch: **42032.75/meta tx** (total gas: 4203275)
 
-As you can see, the gas usage reductions are pretty significant. For 100 meta tx, the tx cost has come down from 57032.51/mtx to 42032.75/mtx.
+As you can see, the gas usage reductions are pretty significant. For 100 meta tx, the tx cost has come down from 57032.51/mtx to **42032.75/mtx**.
 
-But it's hard to assure that all the receivers will have an existing non-zero token balance. Although we now know what's the gas usage in the best scenario (42032.75 gas/mtx) and what's in the worst scenario (57032.51 gas/mtx). So every other option falls into that range.
+### Test #8 (receiver has a non-zero balance AND sender has a non-zero nonce)
+
+Results:
+
+- 1 meta tx in the batch: 58666/meta tx (total gas: 58666)
+- 5 meta txs in the batch: 33026.4/meta tx (total gas: 165132)
+- 10 meta txs in the batch: 29831.8/meta tx (total gas: 298318)
+- 50 meta txs in the batch: 27311.1/meta tx (total gas: 1365555)
+- 100 meta txs in the batch: **27031.43/meta tx** (total gas: 2703143)
+
+As you can see, in this test the gas usage is significanlty reduced. Meta txs in this case perform much better than a normal on-chain token transfer, even for as low as 5 meta transactions.
 
 ## Conclusion
 
-Batched meta transactions (at least in this implementation) **do not reduce the gas cost for M-to-M transactions** (many senders, many receivers - Test #6). Note that this means that all senders and all receivers are unique addresses (no duplicates) and that **receivers have not held any tokens before**.
+The gas usage for M-to-M meta transactions depends a lot on whether the senders are first time (meta tx) senders and whether receivers held a prior token balance.
+
+The gas usage can thus vary from 27031.43/meta tx (47% cheaper than an on-chain transaction) to 57032.51/meta tx (12% more expensive than an on-chain transaction).
+
+But it may be fair to say that with time, the gas usage would go towards the lower end of the spectrum, because fewer and fewer senders would have a zero meta nonce value.
 
 ![](img/batched-meta-txs-gas-usage-per-batch-size.png)
 
-Where we have seen gas reductions were the **1-to-1** (1 sender, 1 receiver - Tests #2 & #3), **1-to-M** (1 sender, many receivers - Test #4), **M-to-1** (M senders, 1 receiver - Test #5), and **M-to-M** (if receivers held **non-null** token balance before - Test #7) examples. 
+We have also seen significant gas reductions in **1-to-1** (1 sender, 1 receiver - Tests #2 & #3), **1-to-M** (1 sender, many receivers - Test #4), **M-to-1** (M senders, 1 receiver - Test #5) examples. 
 
-So **batched meta transactions may still make sense for some use cases**, for example, the following:
-
-- 1 sender wanting to send tokens to many receivers (for example a project sending weekly token rewards, like Balancer). But in this case, a solution like [Disperse.app](https://disperse.app/) makes more sense, because there is no need for a separate relayer and also no need to sign each meta tx (because the whole on-chain tx is already signed).
-- Many senders sending tokens to 1 receiver (example: a deposit to a lock contract in order to access L2 - if a bridge to L2 is configured this way).
+Hence, it may make sense for ERC-20 tokens to extend the functionality by adding the `processMetaBatch()` function.
 
 ## Sources
 
@@ -579,4 +606,4 @@ So **batched meta transactions may still make sense for some use cases**, for ex
 
 I'm looking forward to your feedback! 🙂 Please share it using GitHub issues or [this Ethereum Magicians topic](https://ethereum-magicians.org/t/batched-meta-transactions-from-multiple-users-is-this-ready-for-an-eip-draft/4613). Thanks!
 
-> P.S.: A huge thanks to Patrick McCorry (@stonecoldpat), Artem Kharlamov (@banteg), and Ronan Sandford (@wighawag) for providing valuable feedback.
+> P.S.: A huge thanks to Patrick McCorry (@stonecoldpat), Artem Kharlamov (@banteg), [matt from Ethereum Magicians](https://ethereum-magicians.org/u/matt/summary), and Ronan Sandford (@wighawag) for providing valuable feedback.

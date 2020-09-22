@@ -1,6 +1,6 @@
 const ERC20MetaBatch = artifacts.require("ERC20MetaBatch");
 
-const testRounds = 10; // set number of meta txs that you want to be sent in one batch (for all tests below)
+const testRounds = 100; // set number of meta txs that you want to be sent in one batch (for all tests below)
 
 function sliceSignature(signature) {
     let r = signature.slice(0, 66);
@@ -458,8 +458,12 @@ contract("Test #6 (M-to-M): " + testRounds + " senders, " + testRounds + " recei
     });
 });
 
-contract("Test #7 (M-to-M existing): " + testRounds + " senders, " + testRounds + " receivers (with existing non-null balance); number of meta txs: " + testRounds, async accounts => {    
+contract("Test #7 & 8 (M-to-M existing): " + testRounds + " senders, " + testRounds + " receivers (with existing non-null balance); number of meta txs: " + testRounds, async accounts => {    
     
+    let senderObjects = [];
+    let senders = [];
+    let receivers = [];
+
     it("#7 should process " + testRounds + " txs with " + testRounds + " senders and " + testRounds + " receivers (with existing non-null balance)", async() => {
         let instance = await ERC20MetaBatch.deployed();
 
@@ -486,8 +490,6 @@ contract("Test #7 (M-to-M existing): " + testRounds + " senders, " + testRounds 
         let currentBlockNumber = await web3.eth.getBlockNumber();
         let dueBlockNumber = currentBlockNumber + testRounds*2 + 1;
 
-        let senders = [];
-        let receivers = [];
         let amounts = [];
         let relayerFees = [];
         let blocks = [];
@@ -501,6 +503,7 @@ contract("Test #7 (M-to-M existing): " + testRounds + " senders, " + testRounds 
             // create a random sender address
             sender = await web3.eth.accounts.create(web3.utils.randomHex(32));
             senders.push(sender.address);
+            senderObjects.push(sender);
 
             // send 100 tokens on-chain from contract creator to sender
             // that's why due block number needs to be increased (because this below creates plenty new blocks)
@@ -535,11 +538,11 @@ contract("Test #7 (M-to-M existing): " + testRounds + " senders, " + testRounds 
             counter++;
         }
 
-        // balance of a sender BEFORE sending a batch of tokens (should be 100)
+        // balance of a sender BEFORE sending a batch of meta txs
         let balanceSender1 = await instance.balanceOf(senders[0]);
         assert.equal(parseInt(balanceSender1), amountTokensOnchain);
 
-        // balance of a sender BEFORE sending a batch of tokens (should be 100)
+        // balance of a receiver BEFORE sending a batch of meta txs
         let balanceReceiver1 = await instance.balanceOf(receivers[0]);
         assert.equal(parseInt(balanceReceiver1), 10);
 
@@ -562,4 +565,88 @@ contract("Test #7 (M-to-M existing): " + testRounds + " senders, " + testRounds 
         assert.equal(parseInt(balanceRelayer), newRelayerBalance);
         
     });
+
+    it("#8 should process " + testRounds + " txs with " + testRounds + " senders and " + testRounds + " receivers (both having existing non-null balance AND non-null nonce)", async() => {
+        let instance = await ERC20MetaBatch.deployed();
+
+        let relayer = accounts[0];  // contract creator and token holder
+
+        // instantiate variables
+        let sender;
+        let receiver;
+        let amount = 10;
+        let relayerFee = 1;
+        let nonce = 2; // each sender makes their second meta tx
+        let valuesEncoded;
+        let hash;
+        let sigObject;
+        let sigSlices;
+
+        // get a current block number
+        let currentBlockNumber = await web3.eth.getBlockNumber();
+        let dueBlockNumber = currentBlockNumber + testRounds*2 + 1;
+        
+        let amounts = [];
+        let relayerFees = [];
+        let blocks = [];
+        let vs = [];
+        let rs = [];
+        let ss = [];
+
+        let counter = 0;
+
+        while(counter < testRounds) {
+            sender = senderObjects[counter];
+            receiver = receivers[counter];
+
+            amounts.push(amount);
+
+            relayerFees.push(relayerFee);
+
+            blocks.push(dueBlockNumber);
+
+            valuesEncoded = web3.eth.abi.encodeParameters(['address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'address', 'address'], 
+                                                          [sender.address, receiver, amount, relayerFee, nonce, dueBlockNumber, instance.address, relayer]);
+            
+            hash = web3.utils.keccak256(valuesEncoded);
+
+            // create a signature
+            sigObject = await web3.eth.accounts.sign(hash, sender.privateKey);
+            sigSlices = sliceSignature(sigObject.signature);
+
+            vs.push((sigSlices.v));
+            rs.push(sigSlices.r);
+            ss.push(sigSlices.s);
+
+            counter++;
+        }
+
+        // balance of the relayer BEFORE sending a batch of meta txs
+        let balanceRelayer1 = await instance.balanceOf(relayer);
+
+        // balance of a sender BEFORE sending a batch of meta txs
+        let balanceSender1 = await instance.balanceOf(senders[0]);
+
+        // balance of a receiver BEFORE sending a batch of meta txs
+        let balanceReceiver1 = await instance.balanceOf(receivers[0]);
+
+        // send meta batch tx
+        let result = await instance.processMetaBatch(senders, receivers, amounts, relayerFees, blocks, vs, rs, ss);
+        //console.log(result);
+
+        let gasUsed = result.receipt.gasUsed;
+        console.log("Gas used for #8: " + gasUsed/testRounds + "/meta tx (total gas: " + gasUsed + ")");
+        
+        // balance of a sender AFTER sending a batch of tokens
+        let balanceRelayer2 = await instance.balanceOf(relayer);
+        assert.equal(parseInt(balanceRelayer2) - parseInt(balanceRelayer1), relayerFee*testRounds);
+
+        let balanceSender2 = await instance.balanceOf(senders[0]);
+        assert.equal(parseInt(balanceSender1) - parseInt(balanceSender2), amount + relayerFee);
+        
+        let balanceReceiver2 = await instance.balanceOf(receivers[0]);
+        assert.equal(parseInt(balanceReceiver2) - parseInt(balanceReceiver1), amount);
+        
+    });
+
 });
