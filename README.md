@@ -1,4 +1,4 @@
-# An ERC-20 extension for batched meta transactions
+# Economic viability of batched meta transactions (through an ERC-20 extension)
 
 ## Simple Summary
 
