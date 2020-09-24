@@ -12,13 +12,15 @@ Note that this research uses an implementation in form of a function called `pro
 
 ## Abstract
 
-Gas usage of batched meta transactions is affected by many factors ranging from the batch size, to the amount of expensive SSTORE instructions where storage value is set to non-zero from zero.
+Gas usage of batched meta transactions is affected by **many factors** ranging from the batch size, to the amount of expensive SSTORE instructions where storage value is set to non-zero from zero.
 
-In this research, tests have been made for various scenarios in order to determine gas usage and figure out which kinds of batched meta transactions are the most cost-effective.
+In this research, tests have been made for various scenarios in order to determine gas usage and figure out **which kinds** of batched meta transactions are the **most cost-effective**.
 
 The results have shown that batched meta transactions make the most sense in case the receiver has a prior non-zero token balance and the sender has a prior non-zero meta nonce value.
 
-The M-to-M batched meta transactions use case (many senders, many receivers) turned out as not economically viable enough in terms of gas usage. On the other hand, the M-to-1 use case (many senders, 1 receiver) showed promising gas cost reductions, while also having a good potential for real-world usage.
+The **M-to-M** batched meta transactions use case (many senders, many receivers) turned out as **not economically viable enough** in terms of gas usage. 
+
+On the other hand, the **M-to-1** use case (many senders, 1 receiver) showed **promising gas cost reductions**, while also having a good potential for real-world usage.
 
 ## Proof-of-concept
 
