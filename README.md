@@ -416,7 +416,7 @@ In this example (as opposed to the previous one), the recipient has a prior non-
 
 In this case, the benchmark is **36'000 gas** because the recipient had a prior non-zero token balance. As you can see, the gas usage in this use case **never beats** the benchmark.
 
----------
+<br>
 
 In this group of batched meta transaction tests, none of the use cases beats the benchmark. Even the first example, M-to-1 (to a zero-balance receiver), cannot be considered as successful, because the benchmark should really be 36'000 after the first meta tx is processed.
 
@@ -460,9 +460,17 @@ In this case, the benchmark is 51'000, because the receiver has a zero-value bal
 
 An additional test shows that 4 or more meta txs in a batch have a **lower** average gas than the benchmark (36'000).
 
-------
+<br>
 
 All of the examples beat their respective benchmarks for the second or subsequent sender's meta transactions.
+
+### Graph
+
+This graph represents how M-to-1 and M-to-M fare in case of the first and the second sender's meta transaction.
+
+![](img/batched-meta-txs-gas-usage-1st-2nd.png)
+
+Note that only transactions where the benchmark is 36'000 are included (meaning the recipient has a prior non-zero token balance).
 
 ## The economics
 
