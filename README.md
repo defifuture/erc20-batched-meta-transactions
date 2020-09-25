@@ -606,7 +606,7 @@ The second-time sender would pay **30% less in tx fees** by submitting a meta tx
 
 ### Graph: batch gas structure comparison
 
-![](img/m-to-m_vs_m-to-1_gas-cost-structure.png)
+![](img/on-chain_vs_M-to-M_vs_M-to-1_gas-cost-structure.png)
 
 ## Conclusion
 
