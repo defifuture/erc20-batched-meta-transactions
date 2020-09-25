@@ -1,4 +1,4 @@
-# Economic viability of batched meta transactions (through an ERC-20 extension)
+# The economic viability of batched meta transactions (through an ERC-20 extension)
 
 ## Simple Summary
 
@@ -18,9 +18,9 @@ In this research, tests have been made for various scenarios in order to determi
 
 The results have shown that batched meta transactions make the most sense in case the receiver has a prior non-zero token balance and the sender has a prior non-zero meta nonce value.
 
-The **M-to-M** batched meta transactions use case (many senders, many receivers) turned out as **not economically viable enough** in terms of gas usage. 
+The **M-to-M** batched meta transactions use case (many senders, many receivers) turned out as **not economically viable enough** in terms of gas savings. 
 
-On the other hand, the **M-to-1** use case (many senders, 1 receiver) showed **promising gas cost reductions**, while also having a good potential for real-world usage.
+On the other hand, the **M-to-1** use case (many senders, 1 receiver) showed **promising gas cost reductions**, while also having good potential for real-world usage.
 
 ## Proof-of-concept
 
@@ -113,13 +113,13 @@ If a relayer gets the order wrong, the `processMetaBatch()` function would notic
 
 Nonces are needed due to the replay protection (see [Replay attacks](#replay-attacks) under *Security Considerations*).
 
-The function `nonceOf()` is optional, because if the meta nonce mapping is set to public, the function is not needed:
+The function `nonceOf()` is optional because if the meta nonce mapping is set to public, the function is not needed:
 
 ```solidity
 mapping (address => uint256) public _metaNonces;
 ```
 
-This is the approach that Uniswap uses for their [UniswapV2ERC20.sol](https://github.com/Uniswap/uniswap-v2-core/blob/4dd59067c76dea4a0e8e4bfdda41877a6b16dedc/contracts/UniswapV2ERC20.sol#L19) smart contract.
+This is the approach that Uniswap uses in its [UniswapV2ERC20.sol](https://github.com/Uniswap/uniswap-v2-core/blob/4dd59067c76dea4a0e8e4bfdda41877a6b16dedc/contracts/UniswapV2ERC20.sol#L19) smart contract.
 
 A more **appropriate** approach, though, is to set the mapping to **private** and access the values via the `nonceOf()` function:
 
@@ -156,7 +156,7 @@ function nonceOf(address account) public view returns (uint256) {
 
 ### The front-end implementation (relayer-side)
 
-The `processMetaBatch()` function is agnostic to how relayers work and are organised.
+The `processMetaBatch()` function is agnostic to how relayers work and are organized.
 
 The function can be used by a network of relayers who coordinate to avoid collisions (meta txs with the same nonce meant for the same token contract). Having a network of relayers makes sense for tokens with lots of traffic.
 
@@ -170,7 +170,7 @@ Here is a list of potential security issues and how are they addressed in this i
 
 ### Forging a meta transaction
 
-The solution against a relayer forging a meta transaction is for a user to sign the meta transaction with their own private key.
+The solution against a relayer forging a meta transaction is for a user to sign the meta transaction with their private key.
 
 The `processMetaBatch()` function then verifies the signature using `ecrecover()`.
 
@@ -261,7 +261,7 @@ At a minimum, relayers need to share this meta tx data (in order to detect meta 
 
 ### Too big due block number
 
-The relayer could trick the meta tx sender into adding too big due block number - this means a block by which the meta tx must be processed. The block number could be far in the future, for example, 10 years in the future. This means that relayer would have 10 years to submit the meta transaction.
+The relayer could trick the meta tx sender into adding too big due block number - this means a block by which the meta tx must be processed. The block number could be far in the future, for example, 10 years in the future. This means that the relayer would have 10 years to submit the meta transaction.
 
 **One way** to solve this problem is by adding an upper bound constraint for a block number within the smart contract. For example, we could say that the specified due block number must not be bigger than 100'000 blocks from the current one (this is around 17 days in the future if we assume 15 seconds block time).
 
@@ -274,7 +274,7 @@ if(block.number > blocks[i] || blocks[i] > (block.number + 100000)) {
 }
 ```
 
-This addition could open new security implications, that's why it is left out of this proof-of-concept. But anyone who wishes to implement it, should know about this potential constraint, too.
+This addition could open new security implications, that's why it is left out of this proof-of-concept. But anyone who wishes to implement it should know about this potential constraint, too.
 
 **The other way** is to keep the `processMetaBatch()` function as it is and rather check for the too big due block number **on the relayer level**. In this case, the user could be notified about the problem and could issue a new meta tx with another relayer that would have a much lower block parameter (and the same nonce).
 
@@ -284,11 +284,11 @@ This addition could open new security implications, that's why it is left out of
 
 The meta tx sender defines how big the fee they want to pay to the relayer.
 
-Although more likely the relayer will suggest (maybe even enforce) a certain amount of the relayer fee via the UI (the web3 application).
+Although it is more likely that the relayer will suggest (maybe even enforce) a certain amount of the relayer fee via the UI (the web3 application).
 
 ### How can relayer prevent an invalid meta tx to be relayed?
 
-The relayer can do some meta tx checks in advance, before sending it on-chain.
+The relayer can do some meta tx checks in advance before sending it on-chain.
 
 - Check if a signature is valid
 - Check if a sender or a receiver is a null address (0x0)
@@ -305,7 +305,7 @@ This means adding a couple of new functions to ERC-20 that would allow relayers 
 
 This might be possible if all relayers make the on-chain transactions via a special "relayer smart contract" (which then sends multiple txs to token smart contracts). 
 
-But this relayer smart contract would need to have a token spending approval from every user (for each token separately), which would need to be done on-chain, or via the `permit()` function.
+But this relayer smart contract would need to have a token spending approval from every user (for each token separately), which would need to be made on-chain, or via the `permit()` function.
 
 More info here: 
 
@@ -318,9 +318,9 @@ There are three main types of batched meta transactions:
 
 - 1-to-M: 1 sender, many recipients
 - M-to-1: many senders, 1 recipient
-- M-to-M: many senders, many recipient
+- M-to-M: many senders, many recipients
 
-Right from the start we can see that **1-to-M use case does not make sense** for this implementation, because if there's only one unique sender in the whole batch, there's no need to sign and then validate each meta tx separately (which costs additional gas). In this case, a token multisender such as [Disperse.app](http://disperse.app/) can be more useful (higher throughput) and less costly.
+Right from the start, we can see that **1-to-M use case does not make sense** for this implementation, because if there's only one unique sender in the whole batch, there's no need to sign and then validate each meta tx separately (which costs additional gas). In this case, a token multisender such as [Disperse.app](http://disperse.app/) can be more useful (higher throughput) and less costly.
 
 The *Gas usage* section below will thus focus **only** on the **M-to-1** and **M-to-M** use cases.
 
@@ -333,12 +333,12 @@ The *Gas usage* section below will thus focus **only** on the **M-to-1** and **M
 
 ## Gas usage tests
 
-Gas usage is heavily dependend on whether a meta transaction is **the first transaction** of a **sender** (where prior nonce value is zero) and whether the **receiver** held any **prior token balance**.
+Gas usage is heavily dependent on whether a meta transaction is **the first transaction** of a **sender** (where prior nonce value is zero) and whether the **receiver** held any **prior token balance**.
 
 The gas usage tests are thus separated into two groups:
 
-- **First-meta-transaction tests** (initially sender has a zero nonce, and receiver has a zero token balance)
-- **Second-meta-transaction tests** (sender has a non-zero nonce value, and receiver has a non-zero token balance)
+- **First-meta-transaction tests** (initially sender has a zero nonce, and a receiver has a zero token balance)
+- **Second-meta-transaction tests** (sender has a non-zero nonce value, and a receiver has a non-zero token balance)
 
 All the tests were run with different batch sizes:
 
@@ -354,7 +354,7 @@ A benchmark for the following tests is gas usage cost in case of a **normal on-c
 
 There are **two possible benchmarks** and they both depend on whether a recipient has a prior non-zero token balance, or not.
 
-In case a **recipient's token balance** prior to the meta tx is **zero**, the on-chain transaction cost is **51'000 gas**.
+In case a **recipient's token balance** (prior to the meta tx) is **zero**, the on-chain transaction cost is **51'000 gas**.
 
 But if a **recipient's token balance is bigger than zero**, the on-chain token transfer transaction would cost only **36'000 gas**.
 
@@ -390,7 +390,7 @@ The M-to-1 (many senders, 1 receiver with a non-zero token balance) gas usage te
 - 50 meta txs in the batch: 38182.62/meta tx (total gas: 1909131)
 - 100 meta txs in the batch: 37875.83/meta tx (total gas: 3787583)
 
-The **benchmark** in this case is **36'000 gas**, because the receiver already has a prior non-zero token balance. **None** of the batch sizes goes below the benchmark.
+The **benchmark**, in this case, is **36'000 gas**, because the receiver already has a prior non-zero token balance. **None** of the batch sizes goes below the benchmark.
 
 #### M-to-M (to a zero-balance receiver)
 
@@ -414,7 +414,7 @@ In this example (as opposed to the previous one), the recipient has a prior non-
 - 50 meta txs in the batch: 42310.62/meta tx (total gas: 2115531)
 - 100 meta txs in the batch: 42032.75/meta tx (total gas: 4203275)
 
-In this case, the benchmark is **36'000 gas** because the recipient had a prior non-zero token balance. As you can see, the gas usage in this use case **never beats** the benchmark.
+In this case, the benchmark is **36'000 gas** because the recipient had a prior non-zero token balance. As you can see, the gas used in this use case **never beats** the benchmark.
 
 <br>
 
@@ -422,9 +422,9 @@ In this group of batched meta transaction tests, none of the use cases beats the
 
 The main issue is, of course, the fact that it is each sender's **first** meta transaction, which means that the sender's nonce has to go from 0 to 1. This SSTORE operation is very expensive and takes 20'000 gas.
 
-Updating a non-zero value (for example raising a nonce value from 1 to 2) is much less expensive operation. It costs only 5'000 gas.
+Updating a non-zero value (for example raising a nonce value from 1 to 2) is a much less expensive operation. It costs only 5'000 gas.
 
-Let's now see the results of **second** meta tx gas tests.
+Let's now see the results of **the second** meta tx gas tests.
 
 ### The second meta transaction (and subsequent transactions)
 
@@ -466,7 +466,7 @@ All of the examples beat their respective benchmarks for the second or subsequen
 
 ### Graph
 
-This graph represents how M-to-1 and M-to-M fare in case of the first and the second sender's meta transaction.
+This graph represents how M-to-1 and M-to-M fare in the case of the first and the second sender's meta transactions.
 
 ![](img/batched-meta-txs-gas-usage-1st-2nd.png)
 
@@ -502,11 +502,11 @@ Since meta txs from first-time senders do not go below the benchmark, the relaye
 
 **F) The relayer wants to earn a margin equivalent to 1000 gas per each meta transaction**
 
-Running a relayer is a business that needs to earn a margin (and make profit) in order to make it viable.
+Running a relayer is a business that needs to earn a margin (and make a profit) in order to make it viable.
 
 ---
 
-Following the above assumptions, the formula to calculate gas cost in USD is: 
+Following the above assumptions, the formula to calculate the gas cost in USD is: 
 
 ```
 gas cost in USD = 0.000000001 * 500 Gwei * 350 USD * gas amount
@@ -532,7 +532,7 @@ The gas savings for all the 35 second-time senders is **304'220 gas**.
 
 Since relayers are passing the gas cost overages (over the benchmark) of first-time senders to second-time senders, we need to make additional calculations in order to determine the final gas cost per meta tx for second-time senders.
 
-We need to subtract the gas cost overage of first-time senders from the gas savings of second-time senders. In addition, we also need to subtract the margin that relayer expects from this batch (`50 * 1000 gas`):
+We need to subtract the gas cost overage of first-time senders from the gas savings of second-time senders. In addition, we also need to subtract the margin that the relayer expects from this batch (`50 * 1000 gas`):
 
 ```
 final gas savings for second-time senders = 304220 - 94665 - 50000 = 159555 gas
@@ -556,9 +556,9 @@ To sum up, let's take a look at how much each of the users would pay for a meta 
 
 - **First-time sender:** 6.30 USD/mtx (0 USD savings compared to benchmark)
 - **Second-time sender:** 5.50 USD/mtx (0.80 USD/mtx savings compared to benchmark)
-- **Relayer's margin (for the whole batch):** 8.75 USD (50'000 gas)
+- **Relayer's margin:** 0.175 USD/mtx (8.75 USD for the whole batch)
 
-The second-time sender would pay **12.7% less in tx fees** by submitting a meta tx, compared to doing an on-chain token transfer transaction (benchmark).
+The second-time sender would pay **13% less in tx fees** by submitting a meta tx, compared to doing an on-chain token transfer transaction (benchmark).
 
 ### M-to-1 economics
 
@@ -600,25 +600,33 @@ To sum up, let's take a look at how much each of the users would pay for a meta 
 
 - **First-time sender:** 6.30 USD/mtx (0 USD savings compared to benchmark)
 - **Second-time sender:** 4.47 USD/mtx (1.83 USD/mtx savings compared to benchmark)
-- **Relayer's margin (for the whole batch):** 8.75 USD (50'000 gas)
+- **Relayer's margin:** 0.175 USD/mtx (8.75 USD for the whole batch)
 
 The second-time sender would pay **30% less in tx fees** by submitting a meta tx, compared to doing an on-chain token transfer transaction (benchmark).
+
+### Graph: batch gas structure comparison
+
+![](img/m-to-m_vs_m-to-1_gas-cost-structure.png)
 
 ## Conclusion
 
 The gas savings for **M-to-M** meta transactions (13%) are much lower compared to gas savings for **M-to-1** meta txs (30%).
 
-That said, these savings heavily rely on a **strategy** that each relayer employs. The strategy (assumptions) in these examples are one option, but a relayer could decide to take a different path, which means the potential gas savings could be a lot different.
+That said, these savings heavily rely on a **strategy** that each relayer employs. The strategy in these examples is one option, but a relayer could decide to take a different path, which means the potential gas savings could be a lot different.
 
 Still, the ratio between M-to-M and M-to-1 gas costs should remain more or less the same. **M-to-1** obviously **does a much better job** at keeping gas **costs lower** than M-to-M.
 
-Considering the examples above, it's hard to see M-to-M batching approach as an economically viable option (but, again, a different relayer strategy may counter this conclusion).
+Considering the examples above, it's hard to see the M-to-M batching approach as an economically viable option (but, again, a different relayer strategy may counter this conclusion).
 
 A **much more promising** use case is using **M-to-1** batched meta transactions. This could be quite handy in concert **with other L2 solutions** (like sidechains) where a user needs to deposit funds to a constant address.
 
 Another use case could be locking tokens for staking, or putting them in a yield farming vault (applicable only if the receiving address is the same for all users).
 
-Meta transactions are an interesting concept that is worth exploring and will surely find its spot within the Ethereum ecosystem.
+To conclude - depending on the **relayer strategy** and the **use case**, batched meta transactions can bring the transaction costs down for transferring tokens. 
+
+But these reductions are **not as significant** as one would hope. In some cases it's even cheaper to send a normal on-chain token transaction instead of a meta transaction.
+
+Nevertheless, the topic of meta transactions **should be explored further** in order to find **specialized use cases** where meta transactions can provide a **valuable** solution.
 
 ## Sources
 
