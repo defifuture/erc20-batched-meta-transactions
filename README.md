@@ -2,9 +2,9 @@
 
 ## Simple Summary
 
-A meta transaction is a cryptographically signed message that a user sends to a relayer who then makes an on-chain transaction based on the meta transaction data. A relayer effectively pays gas fees in Ether, while a meta tx sender can compensate the relayer in tokens (a "gas-less" transaction).
+A meta transaction is a cryptographically signed message that a user sends to a relayer who then makes an on-chain transaction based on the meta transaction data. A relayer effectively pays gas fees in Ether, while a meta transaction sender can compensate the relayer in tokens (a "gas-less" transaction).
 
-This proposal offers a solution to relay **multiple** meta transactions as a batch in one on-chain transaction. This reduces the gas cost that the relayer needs to pay, which in turn reduces the relayer fee that each meta tx sender pays in tokens.
+This proposal offers a solution to relay **multiple** meta transactions as a batch in one on-chain transaction. This reduces the gas cost that the relayer needs to pay, which in turn reduces the relayer fee that each meta transaction sender pays in tokens.
 
 ## Abstract
 
@@ -24,7 +24,7 @@ The motivation behind this EIP is to find a way to allow relaying multiple meta 
 
 ### How the system works
 
-A user sends a meta transaction to a relayer (through the relayer's web app, for example). The relayer waits for multiple meta transactions to arrive until the meta tx fees (paid in tokens) cover the cost of the on-chain gas fee (plus some margin that the relayer wants to earn). 
+A user sends a meta transaction to a relayer (through the relayer's web app, for example). The relayer waits for multiple meta transactions to arrive until the meta transaction fees (paid in tokens) cover the cost of the on-chain gas fee (plus some margin that the relayer wants to earn). 
 
 Then the relayer relays a batch of meta transactions using one on-chain transaction to the token contract (triggering the `processMetaBatch()` function).
 
@@ -35,7 +35,7 @@ Technically, the implementation means **adding a couple of functions** to the ex
 - `processMetaBatch()`
 - `nonceOf()`
 
-You can see the proof-of-concept implementation in this file: [ERC20MetaBatch.sol](https://github.com/defifuture/erc20-batched-meta-transactions/blob/master/contracts/ERC20MetaBatch.sol). This is an extended ERC-20 contract with added meta tx batch transfer capabilities (see function `processMetaBatch()`).
+You can see the proof-of-concept implementation in this file: [ERC20MetaBatch.sol](https://github.com/defifuture/erc20-batched-meta-transactions/blob/master/contracts/ERC20MetaBatch.sol). This is an extended ERC-20 contract with added meta transaction batch transfer capabilities (see function `processMetaBatch()`).
 
 ### `processMetaBatch()`
 
@@ -120,12 +120,12 @@ function nonceOf(address account) public view returns (uint256) {
 
 ### What data is needed in a meta transaction?
 
-- sender address (a user that is sending the meta tx)
+- sender address (a user that is sending the meta transaction)
 - receiver address
 - token amount to be transferred - uint256
 - relayer fee (in tokens) - uint256
 - **nonce** (replay protection within the token contract)
-- block number - uint256 (a block by which the meta tx must be processed)
+- block number - uint256 (a block by which the meta transaction must be processed)
 - **token contract address** (replay protection across different token contracts)
 - **the relayer address** (front-running protection)
 - signature (comes in three parts and it signs a hash of the values above):
@@ -162,9 +162,9 @@ As you can see, the `processMetaBatch()` function takes the following parameters
 - an array of **block numbers** (a due "date" for meta transaction to be processed)
 - Three arrays that represent parts of a **signature** (v, r, s)
 
-**Each item** in these arrays represents **data of one meta tx**. That's why the **correct order** in the arrays is very important.
+**Each item** in these arrays represents **data of one meta transaction**. That's why the **correct order** in the arrays is very important.
 
-If a relayer gets the order wrong, the `processMetaBatch()` function would notice that (when validating a signature), because the hash of the meta tx values would not match the signed hash. A meta transaction with an invalid signature is **skipped**.
+If a relayer gets the order wrong, the `processMetaBatch()` function would notice that (when validating a signature), because the hash of the meta transaction values would not match the signed hash. A meta transaction with an invalid signature is **skipped**.
 
 ### Why is nonce not one of the parameters?
 
@@ -174,7 +174,7 @@ This also helps avoid the "Stack too deep" error.
 
 ### Token transfers
 
-Token transfers could alternatively be done by calling the `_transfer()` function (part of the OpenZeppelin ERC-20 implementation), but it would increase the gas usage and it would also revert the whole batch if some meta tx was invalid (the current implementation just skips it).
+Token transfers could alternatively be done by calling the `_transfer()` function (part of the OpenZeppelin ERC-20 implementation), but it would increase the gas usage and it would also revert the whole batch if some meta transaction was invalid (the current implementation just skips it).
 
 Another gas usage optimization is to assign total relayer fees to the relayer at the end of the function, and not with every token transfer inside the for loop (thus avoiding multiple SSTORE calls that cost 5'000 gas).
 
@@ -196,9 +196,9 @@ The `processMetaBatch()` function then verifies the signature using `ecrecover()
 
 The `processMetaBatch()` function is secure against two types of a replay attack:
 
-**Using the same meta tx twice in the same token smart contract**
+**Using the same meta transaction twice in the same token smart contract**
 
-A nonce prevents a replay attack where a relayer would send the same meta tx more than once.
+A nonce prevents a replay attack where a relayer would send the same meta transaction more than once.
 
 **Using the same meta tx twice in different token smart contracts**
 
@@ -222,7 +222,7 @@ if(sender != ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\
 
 Why not revert the whole on-chain transaction? Because there could be only one problematic meta tx, and the others should not be dropped just because of one rotten apple.
 
-That said, it is expected of relayers to validate meta txs in advance before relaying them. That's why relayers are not entitled to a relayer fee for an invalid meta tx.
+That said, it is expected of relayers to validate meta transactions in advance before relaying them. That's why relayers are not entitled to a relayer fee for an invalid meta tx.
 
 ### Malicious relayer forcing a user into over-spending
 
@@ -272,7 +272,7 @@ If the meta tx was "stolen", the signature check would fail because the `msg.sen
 
 A user that is either malicious or just impatient could submit a meta tx with the same nonce (for the same token contract) to various relayers. Only one of them would get the relayer fee (the first one on-chain), while the others would get an invalid meta transaction.
 
-**Solution:** Relayers could **share a list of their pending meta txs** between each other (sort of an info mempool).
+**Solution:** Relayers could **share a list of their pending meta transactions** between each other (sort of an info mempool).
 
 The relayers don't have to fear that someone would steal their respective pending transactions, due to the front-running protection (see above).
 
@@ -328,7 +328,7 @@ This means adding a couple of new functions to ERC-20 that would allow relayers 
 
 ### Is it possible to somehow use the existing ERC-20 token contracts?
 
-This might be possible if all relayers make the on-chain transactions via a special "relayer smart contract" (which then sends multiple txs to token smart contracts). 
+This might be possible if all relayers make the on-chain transactions via a special "relayer smart contract" (which then sends multiple transactions to token smart contracts). 
 
 But this relayer smart contract would need to have a token spending approval from every user (for each token separately), which would need to be made on-chain, or via the `permit()` function.
 
@@ -493,7 +493,7 @@ Benchmarks score:
 - 50 meta txs in the batch: 42298.14/meta tx (total gas: 2114907)
 - 100 meta txs in the batch: 42032.27/meta tx (total gas: 4203227)
 
-> In this case, the "On-chain token transfer" benchmark is 51'000, because the receiver has a zero-value balance. This M-to-M example beats the benchmark starting from 4 meta txs in a batch.
+> In this case, the "On-chain token transfer" benchmark is 51'000, because the receiver has a zero-value balance. This M-to-M example beats the benchmark starting from 4 meta transactions in a batch.
 
 Benchmarks score:
 
@@ -508,7 +508,7 @@ Benchmarks score:
 - 50 meta txs in the batch: 27307.98/meta tx (total gas: 1365399)
 - 100 meta txs in the batch: 27033.59/meta tx (total gas: 2703359)
 
-> An additional test shows that 4 or more meta txs in a batch have a lower average gas than the "On-chain token transfer" benchmark (36'000).
+> An additional test shows that 4 or more meta transactions in a batch have a lower average gas than the "On-chain token transfer" benchmark (36'000).
 
 Benchmarks score:
 
@@ -543,15 +543,15 @@ At the time of writing these words, the ETH price is 350 USD, so let's take this
 
 This means the benchmark is always 36'000 gas. Having a constant benchmark will make calculations and cost comparisons easier.
 
-**D) A relayer sends the batch after it reaches the size of 50 meta txs**
+**D) A relayer sends the batch after it reaches the size of 50 meta transactions**
 
 Let's say the token is very popular, so there are plenty of people who want to send a meta transaction and the relayer has no trouble getting 50 meta transactions into a single batch.
 
-**E) A relayer includes (in a batch) no more than 15 meta txs from first-time senders**
+**E) A relayer includes (in a batch) no more than 15 meta transactions from first-time senders**
 
 Meta transactions coming from first-time senders are the most expensive (because these senders have a zero nonce value). 
 
-Since meta txs from first-time senders do not go below the benchmark, the relayer subsidizes them by charging second-time senders more.
+Since meta transactions from first-time senders do not go below the benchmark, the relayer subsidizes them by charging second-time senders more.
 
 **F) The relayer wants to earn a margin equivalent to 1000 gas per each meta transaction**
 
