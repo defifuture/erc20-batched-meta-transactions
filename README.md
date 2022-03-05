@@ -1,4 +1,4 @@
-# EIP-3005: Batched meta transactions (+ gas usage tests and more)
+# EIP-3005: Batched meta transactions (with gas usage tests and more)
 
 ## Simple Summary
 
@@ -24,7 +24,7 @@ The motivation behind this EIP is to find a way to allow relaying multiple meta 
 
 ### How the system works
 
-A user sends a meta transaction to a relayer (through relayer's web app, for example). The relayer waits for multiple meta txs to arrive until the meta tx fees (paid in tokens) cover the cost of the on-chain gas fee (plus some margin that the relayer wants to earn). 
+A user sends a meta transaction to a relayer (through the relayer's web app, for example). The relayer waits for multiple meta transactions to arrive until the meta tx fees (paid in tokens) cover the cost of the on-chain gas fee (plus some margin that the relayer wants to earn). 
 
 Then the relayer relays a batch of meta transactions using one on-chain transaction to the token contract (triggering the `processMetaBatch()` function).
 
@@ -98,7 +98,7 @@ function processMetaBatch(address[] memory senders,
 }
 ```
 
-> Note that the OpenZeppelin ERC-20 implementation was used here. Some other implementation may have named the balances mapping differently, which would require minor changes in the `processMetaBatch()` function.
+> Note that the OpenZeppelin ERC-20 implementation was used here. Some other implementations may have named the balances mapping differently, which would require minor changes in the `processMetaBatch()` function.
 
 ### `nonceOf()`
 
@@ -139,7 +139,7 @@ function nonceOf(address account) public view returns (uint256) {
 
 The `processMetaBatch()` function is agnostic to how relayers work and are organized.
 
-The function can be used by a network of relayers who coordinate to avoid collisions (meta txs with the same nonce meant for the same token contract). Having a network of relayers makes sense for tokens with lots of traffic.
+The function can be used by a network of relayers who coordinate to avoid collisions (meta transactions with the same nonce meant for the same token contract). Having a network of relayers makes sense for tokens with lots of traffic.
 
 A relayer would most likely have a website (web3 application) through which a user could submit a meta transaction. Pending meta transactions can be logged in that website's database (and communicated with other relayers to avoid collisions) until the relayer decides to make an on-chain transaction.
 
@@ -155,11 +155,11 @@ The `processMetaBatch()` function thus does the job of receiving a batch of meta
 
 As you can see, the `processMetaBatch()` function takes the following parameters:
 
-- an array of **sender addresses** (meta txs senders, not relayers)
+- an array of **sender addresses** (meta transactions senders, not relayers)
 - an array of **receiver addresses**
 - an array of **amounts**
 - an array of **relayer fees** (relayer is `msg.sender`)
-- an array of **block numbers** (a due "date" for meta tx to be processed)
+- an array of **block numbers** (a due "date" for meta transaction to be processed)
 - Three arrays that represent parts of a **signature** (v, r, s)
 
 **Each item** in these arrays represents **data of one meta tx**. That's why the **correct order** in the arrays is very important.
@@ -178,9 +178,9 @@ Token transfers could alternatively be done by calling the `_transfer()` functio
 
 Another gas usage optimization is to assign total relayer fees to the relayer at the end of the function, and not with every token transfer inside the for loop (thus avoiding multiple SSTORE calls that cost 5'000 gas).
 
-## Backwards Compatibility
+## Backward Compatibility
 
-The code implementation of batched meta transactions is backwards compatible with ERC-20 (it only extends it with one function).
+The code implementation of batched meta transactions is backward compatible with ERC-20 (it only extends it with one function).
 
 ## Security Considerations
 
@@ -204,7 +204,7 @@ A nonce prevents a replay attack where a relayer would send the same meta tx mor
 
 A token smart contract address must be added into the signed hash (of a meta tx). 
 
-This address does not need to be sent as a parameter into the `processMetaBatch()` function. Instead the function uses `address(this)` when constructing a hash in order to verify the signature. This way a meta tx not intended for the token smart contract would be rejected (skipped).
+This address does not need to be sent as a parameter into the `processMetaBatch()` function. Instead, the function uses `address(this)` when constructing a hash in order to verify the signature. This way a meta tx not intended for the token smart contract would be rejected (skipped).
 
 ### Signature validation
 
@@ -220,7 +220,7 @@ if(sender != ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\
 }
 ```
 
-Why not reverting the whole on-chain transaction? Because there could be only one problematic meta tx, and the others should not be dropped just because of one rotten apple.
+Why not revert the whole on-chain transaction? Because there could be only one problematic meta tx, and the others should not be dropped just because of one rotten apple.
 
 That said, it is expected of relayers to validate meta txs in advance before relaying them. That's why relayers are not entitled to a relayer fee for an invalid meta tx.
 
@@ -276,7 +276,7 @@ A user that is either malicious or just impatient could submit a meta tx with th
 
 The relayers don't have to fear that someone would steal their respective pending transactions, due to the front-running protection (see above).
 
-If relayers see meta transactions from a certain sender address that have the same nonce and are supposed to be relayed to the same token smart contract, they can decide that only the first registered meta tx goes through and others are dropped (or in case meta txs were registered at the same time, the remaining meta tx could be randomly picked).
+If relayers see meta transactions from a certain sender address that have the same nonce and are supposed to be relayed to the same token smart contract, they can decide that only the first registered meta tx goes through and others are dropped (or in case meta transactions were registered at the same time, the remaining meta tx could be randomly picked).
 
 At a minimum, relayers need to share this meta tx data (in order to detect meta tx collision):
 
@@ -293,7 +293,7 @@ The relayer could trick the meta tx sender into adding too big due block number 
 ```solidity
 // the meta tx should be processed until (including) the specified block number, otherwise it is invalid
 if(block.number > blocks[i] || blocks[i] > (block.number + 100000)) {
-    // If current block number is bigger than the requested due block number, skip this meta tx.
+    // If the current block number is bigger than the requested due block number, skip this meta tx.
     // Also skip if the due block number is too big (bigger than 100'000 blocks in the future).
     continue;
 }
@@ -375,7 +375,7 @@ All the tests were run with different batch sizes:
 
 ### Benchmarks
 
-There are two types of benchmarks that ERC-3005 can compare with in regards of gas usage.
+There are two types of benchmarks that ERC-3005 can compare with in regards to gas usage.
 
 #### 1) On-chain token transactions (36'000 or 51'000 gas)
 
@@ -389,7 +389,7 @@ But if a **recipient's token balance is bigger than zero**, the on-chain token t
 
 #### 2) Other meta tx relaying services (144'315 - 191'650 gas)
 
-Another type of a benchmark are other meta tx services like Gas Station Network (GSN).
+Another type of benchmark is other meta tx services like Gas Station Network (GSN).
 
 GSN gas usage for a relayer sits between **144'315** and **191'650** gas (per meta tx), based on transactions made on Kovan testnet ([source 1](https://dashboard.tenderly.co/tx/kovan/0x7ae15f0b9ab0327fbcbb08d0ed5b2dddd0af7701579ff987ab3150314b32cd9b), [source 2](https://dashboard.tenderly.co/tx/kovan/0x0a3210d4f8543c0f95c6ce69d0260d1dfb9bc6fcefea32c59fa13372fc7d4e46)).
 
@@ -412,9 +412,9 @@ The M-to-1 (many senders, 1 receiver with a zero token balance) gas usage test r
 - 50 meta txs in the batch: 38485.5/meta tx (total gas: 1924275)
 - 100 meta txs in the batch: 38025.83/meta tx (total gas: 3802583)
 
-A further test has been done to determine that having 4 meta txs in a batch costs 50232 gas/meta tx. 
+A further test has been done to determine that having 4 meta transactions in a batch costs 50232 gas/meta tx. 
 
-> Note that in this case the "On-chain token transfer" benchmark should be closer to 36'000, because only the first tx in the batch is sent to the receiver with a 0 balance. After that, receiver does not have a 0 balance anymore.
+> Note that in this case, the "On-chain token transfer" benchmark should be closer to 36'000 because only the first tx in the batch is sent to the receiver with a 0 balance. After that, the receiver does not have a 0 balance anymore.
 
 Benchmarks score:
 
@@ -663,15 +663,15 @@ The second-time sender would pay **30% less in tx fees** by submitting a meta tx
 
 ## Conclusion
 
-The gas usage tests shows that normal on-chain token transactions can often make more sense than using meta transactions.
+The gas usage tests show that normal on-chain token transactions can often make more sense than using meta transactions.
 
 Why would someone want to use meta transactions then?
 
-Meta transactions come useful for **gas-less** transactions, when a user doesn't have any ETH on their account. 
+Meta transactions come useful for **gas-less** transactions when a user doesn't have any ETH on their account. 
 
 In this case, the user might decide to use meta transactions even if it's a bit costlier - although considering that the alternative means buying ETH first and transferring it to an account, (ERC-3005) meta transactions can actually be cheaper in all cases.
 
-Compared to other meta transaction services, EIP-3005 is less gas demanding. But some of these services take advantage of the `permit()` function, which means they can offer relays of much broader amount of tokens than EIP-3005.
+Compared to other meta transaction services, EIP-3005 is less gas demanding. But some of these services take advantage of the `permit()` function, which means they can offer relays of a much broader amount of tokens than EIP-3005.
 
 So in the end, it depends on the use case. In some use cases, one way of transferring tokens is more suitable, in other cases some other way.
 
@@ -679,14 +679,14 @@ Nevertheless, the topic of meta transactions should be explored further in order
 
 ## Sources
 
-1. Griffith, Austin Thomas (2018): [Ethereum Meta Transactions](https://medium.com/@austin_48503/ethereum-meta-transactions-90ccf0859e84), Medium, 10 August 2018.
-2. Kharlamov, Artem (2018): [Disperse Protocol](https://github.com/banteg/disperse-research/blob/master/paper/disperse.pdf), GitHub, 27 November 2018.
-3. Lundfall, Martin (2020): [EIP-2612: permit – 712-signed approvals](https://eips.ethereum.org/EIPS/eip-2612), Ethereum Improvement Proposals, no. 2612, April 2020.
-4. Sandford, Ronan (2019): [ERC-1776 Native Meta Transactions](https://github.com/ethereum/EIPs/issues/1776), GitHub, 25 February 2019.
-5. Weiss, Yoav, Dror Tirosh, Alex Forshtat (2018): [EIP-1613: Gas stations network](https://eips.ethereum.org/EIPS/eip-1613), Ethereum Improvement Proposals, no. 1613, November 2018.
+1. Austin Griffith, [Ethereum Meta Transactions](https://medium.com/@austin_48503/ethereum-meta-transactions-90ccf0859e84), Medium, 10 August 2018.
+2. Artem K., [Disperse Protocol](https://github.com/banteg/disperse-research/blob/master/paper/disperse.pdf), GitHub, 27 November 2018.
+3. Martin Lundfall, [EIP-2612: permit – 712-signed approvals](https://eips.ethereum.org/EIPS/eip-2612), Ethereum Improvement Proposals, no. 2612, April 2020.
+4. Ronan Sandford, [ERC-1776 Native Meta Transactions](https://github.com/ethereum/EIPs/issues/1776), GitHub, 25 February 2019.
+5. Yoav Weiss, Dror Tirosh, Alex Forshtat, [EIP-1613: Gas stations network](https://eips.ethereum.org/EIPS/eip-1613), Ethereum Improvement Proposals, no. 1613, November 2018.
 
 ## Feedback
 
-I'm looking forward to your feedback! 🙂 Please share it using GitHub issues or [in the EIP-3005 pull request comment section](https://github.com/ethereum/EIPs/pull/3005). Thanks!
+I'm looking forward to your feedback! Please share it [in the EIP-3005 pull request comment section](https://github.com/ethereum/EIPs/pull/3005). Thanks!
 
-> P.S.: A huge thanks to Patrick McCorry (@stonecoldpat), Artem Kharlamov (@banteg), Matt (@lightclient), and Ronan Sandford (@wighawag) for providing valuable feedback.
+> P.S.: A huge thanks to Patrick (@stonecoldpat), Artem (@banteg), Matt (@lightclient), and Ronan (@wighawag) for providing valuable feedback.
